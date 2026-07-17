@@ -81,3 +81,6 @@ export interface DocumentDetails extends DocumentSummary { textauszug: string; a
 export interface DocumentSection { abschnitt_id: string; text: string; seite?: number | null; folie?: number | null; tabellenblatt?: string | null; abschnittsnummer: number; zeichenanzahl: number; metadaten: Record<string, string | number | boolean | null> }
 export interface DocumentSectionsResponse { gesamt: number; limit: number; offset: number; abschnitte: DocumentSection[] }
 export interface DocumentStatistics { gesamt: number; nach_dateityp: Record<string, number>; nach_hauptordner: Record<string, number>; lesbar: number; fehlerhaft: number; indexiert: number; nicht_indexiert: number; gesamtgroesse_bytes: number; abschnitte_gesamt: number }
+export type AgentKind = 'crm' | 'email' | 'calendar'
+export interface AgentStatus { agent: AgentKind; mode: 'mock' | 'draft' | 'simulation' | 'connected'; provider: string; provider_connected: boolean; external_actions_enabled: boolean; prompt_version: string; capabilities: string[] }
+export interface AgentResponse { request_id: string; agent: AgentKind; status: 'draft' | 'simulation' | 'blocked'; summary: string; output: Record<string, unknown>; approval: { required: boolean; approved: boolean; approval_id: string; reason: string }; external_action_executed: boolean; created_at: string }
