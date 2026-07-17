@@ -1,40 +1,87 @@
-import tempfile
-import unittest
 from pathlib import Path
-from unittest.mock import patch
 
-from fastapi import HTTPException
+import pytest
+from docx import Document
+from fastapi.testclient import TestClient
+from pypdf import PdfWriter
 
-from backend import main
-
-
-class DokumentTests(unittest.TestCase):
-    def test_filter_und_statistik(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            basis = Path(temp_dir)
-            (basis / "01_Exposes").mkdir()
-            (basis / "01_Exposes" / "a.PDF").touch()
-            (basis / "01_Exposes" / "b.jpg").touch()
-            (basis / "notiz.txt").touch()
-
-            with patch.object(main, "DROPBOX_PATH", basis):
-                liste = main.dokumente()
-                statistik = main.dokumente_statistik()
-
-            self.assertEqual(liste["anzahl"], 2)
-            self.assertEqual(statistik["gesamtzahl"], 2)
-            self.assertEqual(statistik["nach_endung"], {".pdf": 1, ".txt": 1})
-            self.assertEqual(
-                statistik["nach_hauptordner"],
-                {"01_Exposes": 1, "Stammordner": 1},
-            )
-
-    def test_fehlender_ordner(self):
-        with patch.object(main, "DROPBOX_PATH", Path("Z:/nicht-vorhanden")):
-            with self.assertRaises(HTTPException) as context:
-                main.dokumente()
-        self.assertEqual(context.exception.status_code, 503)
+from backend import config
+from backend.main import app
+from backend.services.dokument_reader import DokumentLesefehler, lese_dokument
+from backend.services.dokument_scanner import DokumentPfadFehler, dokument_id, relevante_dokumente, sicherer_pfad
 
 
-if __name__ == "__main__":
-    unittest.main()
+@pytest.fixture
+def dropbox(tmp_path, monkeypatch):
+    basis = tmp_path / "Dropbox"
+    basis.mkdir()
+    monkeypatch.setattr(config, "DROPBOX_PATH", basis)
+    return basis
+
+
+def test_dateitypfilter_und_relative_api_pfade(dropbox):
+    (dropbox / "Unterordner").mkdir()
+    (dropbox / "Unterordner" / "a.PDF").touch()
+    (dropbox / "bild.jpg").touch()
+    (dropbox / "notiz.txt").write_text("Hallo", encoding="utf-8")
+
+    dateien = relevante_dokumente()
+    assert [d.suffix.lower() for d in dateien] == [".txt", ".pdf"]
+    antwort = TestClient(app).get("/dokumente")
+    assert antwort.status_code == 200
+    inhalt = antwort.json()
+    assert all(str(dropbox) not in d["pfad"] for d in inhalt["dateien"])
+    assert {d["pfad"] for d in inhalt["dateien"]} == {"notiz.txt", "Unterordner/a.PDF"}
+
+
+def test_pfadsicherheit(dropbox, tmp_path):
+    ausserhalb = tmp_path / "geheim.txt"
+    ausserhalb.write_text("geheim", encoding="utf-8")
+    with pytest.raises(DokumentPfadFehler):
+        sicherer_pfad(ausserhalb)
+    assert TestClient(app).get(f"/dokumente/{dokument_id('../geheim.txt')}").status_code == 404
+
+
+def test_txt_auslesen_und_endpunkte(dropbox):
+    datei = dropbox / "notiz.txt"
+    datei.write_text("Ä" * 3100, encoding="utf-8")
+    doc_id = TestClient(app).get("/dokumente").json()["dateien"][0]["id"]
+    detail = TestClient(app).get(f"/dokumente/{doc_id}")
+    volltext = TestClient(app).get(f"/dokumente/{doc_id}/text")
+    assert detail.status_code == 200
+    assert len(detail.json()["textvorschau"]) == 3000
+    assert len(volltext.json()["text"]) == 3100
+
+
+def test_docx_auslesen(dropbox):
+    datei = dropbox / "test.docx"
+    doc = Document()
+    doc.add_paragraph("DOCX-Inhalt")
+    doc.save(datei)
+    assert "DOCX-Inhalt" in lese_dokument(datei)
+
+
+def test_pdf_auslesen(dropbox):
+    datei = dropbox / "test.pdf"
+    writer = PdfWriter()
+    writer.add_blank_page(width=100, height=100)
+    with datei.open("wb") as stream:
+        writer.write(stream)
+    assert lese_dokument(datei) == ""
+
+
+def test_fehlerhafte_datei_und_lesestatus(dropbox):
+    kaputt = dropbox / "kaputt.pdf"
+    kaputt.write_bytes(b"kein pdf")
+    with pytest.raises(DokumentLesefehler):
+        lese_dokument(kaputt)
+    antwort = TestClient(app).get("/dokumente/lesestatus")
+    assert antwort.status_code == 200
+    assert antwort.json()["nach_dateityp"][".pdf"]["fehlerhaft"] == 1
+
+
+def test_fehlender_ordner(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "DROPBOX_PATH", tmp_path / "fehlt")
+    antwort = TestClient(app).get("/dokumente")
+    assert antwort.status_code == 503
+    assert str(tmp_path) not in antwort.text
