@@ -1,4 +1,4 @@
-import type { ChatRequest, ChatResponse, ChatStatus, DocumentDetails, DocumentFilters, DocumentListResponse, DocumentSectionsResponse, DocumentStatistics, IndexingResponse, KnowledgeStatus } from '../models/api'
+import type { BackendInfo, ChatRequest, ChatResponse, ChatStatus, DocumentDetails, DocumentFilters, DocumentListResponse, DocumentSectionsResponse, DocumentStatistics, IndexingResponse, KnowledgeStatus } from '../models/api'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8010').replace(/\/$/, '')
 const REQUEST_TIMEOUT_MS = 210_000
@@ -41,6 +41,7 @@ async function requestJson<T>(path: string, options: RequestInit = {}): Promise<
   }
 }
 
+export const getBackendInfo = (): Promise<BackendInfo> => requestJson('/')
 export const getChatStatus = (): Promise<ChatStatus> => requestJson('/chat/status')
 export const getKnowledgeStatus = (): Promise<KnowledgeStatus> => requestJson('/wissensbasis/status')
 

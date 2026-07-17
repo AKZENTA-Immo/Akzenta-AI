@@ -37,9 +37,28 @@ function loadChatHistory(): ChatHistoryItem[] {
   }
 }
 
+function buildExport(history: ChatHistoryItem[]): string {
+  const header = `# AKZENTA AI Chat\n\nExportiert am ${new Date().toLocaleString('de-DE')}\n`
+  const conversations = history.map((item, index) => [
+    `## Gespräch ${index + 1}`,
+    '',
+    `**Frage:** ${item.frage}`,
+    '',
+    '**Antwort:**',
+    item.response.antwort || 'Keine Antwort verfügbar.',
+    '',
+    item.response.quellen?.length
+      ? `**Quellen:** ${item.response.quellen.map((source) => source.dateiname).join(', ')}`
+      : '**Quellen:** Keine',
+  ].join('\n'))
+
+  return `${header}\n${conversations.join('\n\n---\n\n')}\n`
+}
+
 export function ChatPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null)
   const [suggestion, setSuggestion] = useState(() => {
     const value = sessionStorage.getItem('akzenta-document-question') || ''
     sessionStorage.removeItem('akzenta-document-question')
@@ -49,9 +68,7 @@ export function ChatPage() {
   const endRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({
-      behavior: 'smooth',
-    })
+    endRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [history, loading])
 
   useEffect(() => {
@@ -89,6 +106,32 @@ export function ChatPage() {
     }
   }
 
+  const regenerate = async (item: ChatHistoryItem) => {
+    setRegeneratingId(item.id)
+    setError('')
+
+    try {
+      const answer = await sendDocumentQuestion({ frage: item.frage, limit: 5 })
+      setHistory((previous) => previous.map((entry) => (
+        entry.id === item.id ? { ...entry, response: answer } : entry
+      )))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Die Antwort konnte nicht neu erstellt werden.')
+    } finally {
+      setRegeneratingId(null)
+    }
+  }
+
+  const exportHistory = () => {
+    const blob = new Blob([buildExport(history)], { type: 'text/markdown;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `akzenta-chat-${new Date().toISOString().slice(0, 10)}.md`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   const clearHistory = () => {
     setHistory([])
     setError('')
@@ -97,10 +140,19 @@ export function ChatPage() {
 
   return (
     <div className="page chat-page">
-      <header className="hero">
-        <span className="eyebrow">Interner Immobilien-Assistent</span>
-        <h1>AKZENTA AI Chat</h1>
-        <p>Stellen Sie Fragen zu Ihrer internen Wissensbasis und erhalten Sie nachvollziehbare Antworten mit Quellen.</p>
+      <header className="hero chat-hero">
+        <div>
+          <span className="eyebrow">Interner Immobilien-Assistent</span>
+          <h1>AKZENTA AI Chat</h1>
+          <p>Stellen Sie Fragen zu Ihrer internen Wissensbasis und erhalten Sie nachvollziehbare Antworten mit Quellen.</p>
+        </div>
+
+        {history.length > 0 && (
+          <div className="chat-header-actions">
+            <button type="button" className="chat-tool-button" onClick={exportHistory}>Chat exportieren</button>
+            <button type="button" className="chat-tool-button danger" onClick={clearHistory}>Chat leeren</button>
+          </div>
+        )}
       </header>
 
       {history.length === 0 && (
@@ -119,25 +171,34 @@ export function ChatPage() {
 
       {history.map((item) => (
         <div key={item.id} className="conversation">
-          <div className="user-question">
-            <strong>Sie</strong>
-            <p>{item.frage}</p>
+          <div className="message-row message-user">
+            <div className="message-avatar user-avatar">S</div>
+            <div className="message-card">
+              <div className="message-heading"><strong>Sie</strong><time>gespeichert</time></div>
+              <p>{item.frage}</p>
+            </div>
           </div>
+
           <ChatMessage response={item.response} />
+
+          <div className="conversation-actions">
+            <button
+              type="button"
+              className="chat-tool-button"
+              onClick={() => void regenerate(item)}
+              disabled={regeneratingId !== null || loading}
+            >
+              {regeneratingId === item.id ? 'Antwort wird neu erstellt …' : 'Antwort neu erstellen'}
+            </button>
+          </div>
         </div>
       ))}
 
       {error && <ErrorMessage message={error} />}
       {loading && <LoadingIndicator label="AKZENTA AI durchsucht die Wissensbasis …" />}
 
-      <ChatInput onSubmit={submit} loading={loading} initialValue={suggestion} />
+      <ChatInput onSubmit={submit} loading={loading || regeneratingId !== null} initialValue={suggestion} />
       <p className="basis-hint">Antworten basieren ausschließlich auf der internen AKZENTA-Wissensbasis.</p>
-
-      {history.length > 0 && (
-        <button type="button" onClick={clearHistory}>
-          Chat leeren
-        </button>
-      )}
 
       <div ref={endRef} />
     </div>
