@@ -1,3 +1,4 @@
+import { FileText } from 'lucide-react'
 import type { ChatSource } from '../models/api'
 
 export function SourceCard({ source }: { source: ChatSource }) {
@@ -5,7 +6,7 @@ export function SourceCard({ source }: { source: ChatSource }) {
   return (
     <details className="source-card">
       <summary>
-        <span className="source-number">{source.quellen_nummer}</span>
+        <span className="source-number"><FileText size={16} /><b>{source.quellen_nummer}</b></span>
         <span><strong>{source.dateiname || 'Unbenannte Quelle'}</strong><small>{source.relativer_pfad || 'Kein Pfad angegeben'}</small></span>
         <span className="relevance">{relevance} %</span>
       </summary>

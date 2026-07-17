@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Send } from 'lucide-react'
 
 interface ChatInputProps {
   onSubmit: (question: string) => void
@@ -27,7 +28,7 @@ export function ChatInput({ onSubmit, loading, initialValue = '' }: ChatInputPro
         maxLength={2000}
         rows={4}
         aria-label="Frage an AKZENTA AI"
-        placeholder="Stellen Sie eine Frage zu Ihren internen Dokumenten …"
+        placeholder="Stellen Sie eine Frage zu Ihren Immobilienunterlagen..."
         onChange={(event) => setQuestion(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); submit() }
@@ -36,7 +37,7 @@ export function ChatInput({ onSubmit, loading, initialValue = '' }: ChatInputPro
       <div className="input-footer">
         <span>{question.length} / 2000</span>
         <button className="primary-button" onClick={submit} disabled={loading || question.trim().length < 3}>
-          {loading ? 'Antwort wird erstellt …' : 'Frage senden'}
+          <Send size={17} aria-hidden="true" />{loading ? 'Antwort wird erstellt …' : 'Frage senden'}
         </button>
       </div>
     </div>

@@ -30,7 +30,7 @@ export function ChatPage() {
 
   return (
     <div className="page chat-page">
-      <header className="hero"><span className="eyebrow">Interner Immobilien-Assistent</span><h1>AKZENTA AI</h1><p>Stellen Sie Fragen zu Ihrer internen Wissensbasis und erhalten Sie nachvollziehbare Antworten mit Quellen.</p></header>
+      <header className="hero"><span className="eyebrow">Interner Immobilien-Assistent</span><h1>AKZENTA AI Chat</h1><p>Stellen Sie Fragen zu Ihrer internen Wissensbasis und erhalten Sie nachvollziehbare Antworten mit Quellen.</p></header>
       {!response && <section className="suggestions" aria-label="Beispielfragen"><span>Beispielfragen</span><div>{suggestions.map((item) => <button key={item} onClick={() => setSuggestion(item)}>{item}<b>→</b></button>)}</div></section>}
       {response && <ChatMessage response={response} />}
       {error && <ErrorMessage message={error} />}

@@ -1,18 +1,23 @@
-export type Page = 'chat' | 'knowledge' | 'documents' | 'settings'
+import { BarChart3, Bot, Building2, ChevronLeft, ChevronRight, FileText, Home, Lightbulb, Megaphone, Phone, Settings, Users } from 'lucide-react'
+import logo from '../assets/akzenta-logo.svg'
 
-const items: Array<{ id: Page; label: string; icon: string }> = [
-  { id: 'chat', label: 'Chat', icon: '✦' },
-  { id: 'knowledge', label: 'Wissensbasis', icon: '▤' },
-  { id: 'documents', label: 'Dokumente', icon: '□' },
-  { id: 'settings', label: 'Einstellungen', icon: '⚙' },
-]
+export type Page = 'dashboard' | 'chat' | 'knowledge' | 'documents' | 'sellers' | 'objects' | 'leads' | 'marketing' | 'phone' | 'settings'
 
-export function Sidebar({ page, onChange }: { page: Page; onChange: (page: Page) => void }) {
-  return (
-    <aside className="sidebar">
-      <div className="brand"><span className="brand-mark">A</span><div><strong>AKZENTA</strong><small>AI Workspace</small></div></div>
-      <nav aria-label="Hauptnavigation">{items.map((item) => <button key={item.id} className={page === item.id ? 'active' : ''} onClick={() => onChange(item.id)}><span>{item.icon}</span>{item.label}</button>)}</nav>
-      <div className="privacy-note"><span className="status-dot" /><div><strong>Vollständig lokal</strong><small>Ihre Daten bleiben auf diesem Gerät.</small></div></div>
-    </aside>
-  )
+const items = [
+  { id: 'dashboard', label: 'Dashboard', icon: BarChart3 }, { id: 'chat', label: 'AKZENTA AI', icon: Bot },
+  { id: 'knowledge', label: 'Wissensbasis', icon: Lightbulb }, { id: 'documents', label: 'Dokumente', icon: FileText },
+  { id: 'sellers', label: 'Verkäufer', icon: Users }, { id: 'objects', label: 'Objekte', icon: Building2 },
+  { id: 'leads', label: 'Leads', icon: Home }, { id: 'marketing', label: 'Marketing', icon: Megaphone },
+  { id: 'phone', label: 'Telefon-Agent', icon: Phone }, { id: 'settings', label: 'Einstellungen', icon: Settings },
+] satisfies Array<{ id: Page; label: string; icon: typeof BarChart3 }>
+
+interface SidebarProps { page: Page; collapsed: boolean; onChange: (page: Page) => void; onToggle: () => void }
+
+export function Sidebar({ page, collapsed, onChange, onToggle }: SidebarProps) {
+  return <aside className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className="sidebar-brand"><img src={logo} alt="AKZENTA Immobilien" />{!collapsed && <div><strong>AKZENTA AI</strong><small>Interner Immobilien-Assistent</small></div>}</div>
+    <button className="sidebar-toggle" onClick={onToggle} aria-label={collapsed ? 'Navigation ausklappen' : 'Navigation einklappen'}>{collapsed ? <ChevronRight size={17} /> : <ChevronLeft size={17} />}</button>
+    <nav aria-label="Hauptnavigation">{items.map(({ id, label, icon: Icon }) => <button key={id} title={collapsed ? label : undefined} className={page === id ? 'active' : ''} onClick={() => onChange(id)}><Icon aria-hidden="true" size={19} strokeWidth={1.8} /><span>{label}</span></button>)}</nav>
+    <div className="sidebar-footer"><img src={logo} alt="" /><span>Version 0.7.1</span></div>
+  </aside>
 }

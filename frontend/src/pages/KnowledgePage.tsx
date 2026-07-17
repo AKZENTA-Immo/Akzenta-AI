@@ -31,7 +31,7 @@ export function KnowledgePage() {
 
   return (
     <div className="page knowledge-page">
-      <header className="page-header"><div><span className="eyebrow">Lokale Dokumentensuche</span><h1>Wissensbasis</h1><p>Status und Aktualisierung des lokalen AKZENTA-Dokumentenindex.</p></div><button className="primary-button" onClick={index} disabled={indexing}>{indexing ? 'Indexierung läuft …' : 'Wissensbasis aktualisieren'}</button></header>
+      <header className="page-header"><div><span className="eyebrow">Lokale Dokumentensuche</span><h1>Wissensbasis</h1><p>Status und Aktualisierung des lokalen AKZENTA-Dokumentenindex.</p></div><button className="primary-button knowledge-action" onClick={index} disabled={indexing}>{indexing ? 'Indexierung läuft …' : 'Wissensbasis aktualisieren'}</button></header>
       {indexing && <div className="indexing-notice"><LoadingIndicator label="Dokumente werden geprüft und indexiert …" /><p>Dies kann abhängig vom Dokumentbestand einige Minuten dauern.</p></div>}
       {error && <ErrorMessage message={error} />}
       {loading && !knowledge ? <LoadingIndicator label="Status wird geladen …" /> : <>

@@ -1,7 +1,7 @@
 {
   "name": "akzenta-ai-frontend",
   "private": true,
-  "version": "0.7.0",
+  "version": "0.7.1",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 5173",
@@ -10,18 +10,20 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.2.8",
+    "lucide-react": "^1.25.0",
     "react": "latest",
     "react-dom": "latest",
     "react-markdown": "latest"
   },
   "devDependencies": {
-    "@vitejs/plugin-react": "latest",
     "@testing-library/jest-dom": "latest",
     "@testing-library/react": "latest",
     "@testing-library/user-event": "latest",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
     "jsdom": "latest",
     "typescript": "latest",
     "vite": "latest",

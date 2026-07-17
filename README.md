@@ -1,11 +1,11 @@
-# AKZENTA AI – Version 0.7
+# AKZENTA AI – Version 0.7.1
 
 Lokale FastAPI-Anwendung mit read-only Dokumentzugriff auf die konfigurierte
 Dropbox und einer persistenten semantischen Wissensbasis in ChromaDB. Embeddings
 werden ausschließlich lokal durch Ollama erzeugt; Cloud-Embedding-Dienste kommen
 nicht zum Einsatz.
 
-Version 0.7 ergänzt eine lokale Weboberfläche mit React, TypeScript und Vite.
+Version 0.7.1 ergänzt die lokale Weboberfläche um das responsive AKZENTA Corporate Design mit einklappbarer Navigation, Lucide-Icons und zentralen Statuskarten.
 Sie bietet den Dokumentenchat mit aufklappbaren Quellen sowie Status und manuelle
 Aktualisierung der Wissensbasis. Dokumente und Einstellungen sind als Bereiche
 für spätere Versionen vorbereitet.

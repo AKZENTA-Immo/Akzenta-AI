@@ -12,7 +12,7 @@ describe('ChatPage', () => {
 
   it('wird mit Beispielfragen geladen', () => {
     render(<ChatPage />)
-    expect(screen.getByRole('heading', { name: 'AKZENTA AI' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'AKZENTA AI Chat' })).toBeInTheDocument()
     expect(screen.getByText(/Welche Vorteile bietet/)).toBeInTheDocument()
   })
 
