@@ -10,4 +10,3 @@ from backend.routers.chat import router as chat_router
 from backend.responses import UTF8JSONResponse
 
 
-app = Fast
