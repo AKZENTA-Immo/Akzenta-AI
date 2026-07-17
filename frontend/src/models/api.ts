@@ -64,3 +64,14 @@ export interface IndexingResponse {
   dauer_sekunden: number
   fehler?: IndexingError[]
 }
+
+export type ReadStatus = '' | 'lesbar' | 'fehlerhaft'
+export type IndexStatus = '' | 'indexiert' | 'nicht_indexiert'
+export type DocumentSort = 'dateiname' | 'dateityp' | 'dateigroesse' | 'geaendert_am' | 'relativer_pfad'
+export interface DocumentFilters { suche: string; dateityp: string; hauptordner: string; lesestatus: ReadStatus; indexstatus: IndexStatus; sortierung: DocumentSort; sortierreihenfolge: 'asc' | 'desc'; limit: number; offset: number }
+export interface DocumentSummary { dokument_id: string; dateiname: string; dateiendung: string; relativer_pfad: string; hauptordner: string; dateigroesse_bytes: number; geaendert_am: string; lesbar: boolean; lesefehler?: string | null; indexiert: boolean; abschnitt_anzahl: number; seiten_oder_elemente?: number | null; mime_typ?: string | null }
+export interface DocumentListResponse { gesamt: number; limit: number; offset: number; dokumente: DocumentSummary[] }
+export interface DocumentDetails extends DocumentSummary { textauszug: string; abschnittsmetadaten: Record<string, unknown> }
+export interface DocumentSection { abschnitt_id: string; text: string; seite?: number | null; folie?: number | null; tabellenblatt?: string | null; abschnittsnummer: number; zeichenanzahl: number; metadaten: Record<string, string | number | boolean | null> }
+export interface DocumentSectionsResponse { gesamt: number; limit: number; offset: number; abschnitte: DocumentSection[] }
+export interface DocumentStatistics { gesamt: number; nach_dateityp: Record<string, number>; nach_hauptordner: Record<string, number>; lesbar: number; fehlerhaft: number; indexiert: number; nicht_indexiert: number; gesamtgroesse_bytes: number; abschnitte_gesamt: number }

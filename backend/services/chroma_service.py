@@ -92,6 +92,21 @@ class ChromaService:
     def anzahl_abschnitte(self) -> int:
         return self.collection().count()
 
+    def dokument_abschnitte(self, dokument_id: str, limit: int, offset: int) -> dict:
+        """Liest ausschließlich bereits indexierte Abschnitte eines Dokuments."""
+        try:
+            ergebnis = self.collection().get(
+                where={"dokument_id": dokument_id},
+                include=["documents", "metadatas"],
+            )
+        except Exception as exc:
+            raise ChromaFehler("Dokumentabschnitte konnten nicht gelesen werden.") from exc
+        eintraege = sorted(
+            zip(ergebnis.get("ids", []), ergebnis.get("documents", []), ergebnis.get("metadatas", [])),
+            key=lambda eintrag: int((eintrag[2] or {}).get("abschnittsnummer", 0)),
+        )
+        return {"gesamt": len(eintraege), "eintraege": eintraege[offset:offset + limit]}
+
     def relativer_speicherort(self) -> str:
         try:
             return self.pfad.relative_to(config.PROJECT_PATH.resolve()).as_posix()

@@ -1,4 +1,4 @@
-import type { ChatRequest, ChatResponse, ChatStatus, IndexingResponse, KnowledgeStatus } from '../models/api'
+import type { ChatRequest, ChatResponse, ChatStatus, DocumentDetails, DocumentFilters, DocumentListResponse, DocumentSectionsResponse, DocumentStatistics, IndexingResponse, KnowledgeStatus } from '../models/api'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8011').replace(/\/$/, '')
 const REQUEST_TIMEOUT_MS = 210_000
@@ -53,3 +53,12 @@ export const sendDocumentQuestion = (request: ChatRequest): Promise<ChatResponse
 
 export const startIndexing = (): Promise<IndexingResponse> =>
   requestJson('/wissensbasis/indexieren', { method: 'POST' })
+
+export const getDocuments = (filters: DocumentFilters, signal?: AbortSignal): Promise<DocumentListResponse> => {
+  const params = new URLSearchParams()
+  Object.entries(filters).forEach(([key, value]) => { if (value !== '') params.set(key, String(value)) })
+  return requestJson(`/dokumente?${params}`, { signal })
+}
+export const getDocumentDetails = (id: string, signal?: AbortSignal): Promise<DocumentDetails> => requestJson(`/dokumente/${encodeURIComponent(id)}`, { signal })
+export const getDocumentSections = (id: string, limit = 5, offset = 0, signal?: AbortSignal): Promise<DocumentSectionsResponse> => requestJson(`/dokumente/${encodeURIComponent(id)}/abschnitte?limit=${limit}&offset=${offset}`, { signal })
+export const getDocumentStatistics = (signal?: AbortSignal): Promise<DocumentStatistics> => requestJson('/dokumente/statistik', { signal })

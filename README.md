@@ -1,14 +1,32 @@
-# AKZENTA AI – Version 0.7.2
+# AKZENTA AI – Version 0.8
 
 Lokale FastAPI-Anwendung mit read-only Dokumentzugriff auf die konfigurierte
 Dropbox und einer persistenten semantischen Wissensbasis in ChromaDB. Embeddings
 werden ausschließlich lokal durch Ollama erzeugt; Cloud-Embedding-Dienste kommen
 nicht zum Einsatz.
 
-Version 0.7.2 verwendet das originale AKZENTA-Logo als lokales, responsiv eingebundenes PNG-Asset. Das Corporate Design umfasst eine einklappbare Navigation, Lucide-Icons und zentrale Statuskarten.
-Sie bietet den Dokumentenchat mit aufklappbaren Quellen sowie Status und manuelle
-Aktualisierung der Wissensbasis. Dokumente und Einstellungen sind als Bereiche
-für spätere Versionen vorbereitet.
+Version 0.8 ergänzt das Corporate Design um ein professionelles Dokumentencenter.
+Es zeigt den ausschließlich lesbaren Bestand mit Statistik, serverseitiger
+Pagination, Suche und Filtern sowie sicheren Metadaten-, Text- und
+Abschnittsvorschauen. Dokumentenchat und Wissensbasis bleiben unverändert verfügbar.
+
+## Dokumentencenter
+
+Der Navigationspunkt **Dokumente** öffnet die responsive Dokumentenübersicht.
+Durchsucht werden Dateiname, relativer Pfad, Hauptordner und Dateiendung. Diese
+Dateilistensuche ist bewusst von der semantischen Inhaltssuche unter
+`/wissensbasis/suche` getrennt. Filter stehen für Dateityp, Hauptordner,
+Lesestatus und Indexstatus bereit; sortiert werden kann nach Name, Typ, Größe,
+Änderungsdatum und relativem Pfad.
+
+- `GET /dokumente` – Suche, Filter, Sortierung und Pagination (`limit` maximal 100)
+- `GET /dokumente/{dokument_id}` – sichere Metadaten und begrenzter Textauszug
+- `GET /dokumente/{dokument_id}/abschnitte` – paginierte Indexabschnitte
+- `GET /dokumente/statistik` – Typen, Ordner, Status, Größe und Abschnitte
+
+Es gibt keinen Download-, Lösch-, Umbenennungs- oder Verschiebe-Endpunkt.
+Absolute Windows-Pfade werden nicht ausgegeben. Die Vorschau rendert Text ohne
+HTML-Ausführung; PDF-/Office-Rendering und OCR sind für spätere Versionen vorgesehen.
 
 ## Architektur
 
@@ -174,6 +192,7 @@ Frontend-Tests und Produktions-Build:
 cd C:\KI-Projekte\Akzenta-AI\frontend
 npm test
 npm run build
+npm audit
 ```
 
 ## Fehlerbehebung
@@ -210,7 +229,7 @@ npm run build
 - Prompt-Injection wird durch Systemregeln, Datengrenzen und Ausgabefilter
   reduziert, kann bei lokalen Sprachmodellen aber nicht mathematisch garantiert
   ausgeschlossen werden.
-- Die Weboberfläche verwaltet derzeit nur Chat und Wissensbasis vollständig;
-  Dokumentverwaltung und Einstellungen folgen in späteren Versionen.
+- Das Dokumentencenter ist eine sichere Text-/Metadatenansicht; native PDF- und
+  Office-Vorschau sowie OCR folgen in späteren Versionen.
 - Chatverläufe werden nicht dauerhaft im Browser gespeichert. Ein Neuladen der
   Seite verwirft die aktuell angezeigte Antwort.

@@ -17,7 +17,7 @@ export function ChatPage() {
   const [response, setResponse] = useState<ChatResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [suggestion, setSuggestion] = useState('')
+  const [suggestion, setSuggestion] = useState(() => { const value = sessionStorage.getItem('akzenta-document-question') || ''; sessionStorage.removeItem('akzenta-document-question'); return value })
   const endRef = useRef<HTMLDivElement>(null)
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [response, loading])
 

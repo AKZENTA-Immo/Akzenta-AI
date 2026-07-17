@@ -18,6 +18,6 @@ export function Sidebar({ page, collapsed, onChange, onToggle }: SidebarProps) {
     <div className="sidebar-brand"><div><strong>AKZENTA AI</strong><small>Interner Immobilien-Assistent</small></div></div>
     <button className="sidebar-toggle" onClick={onToggle} aria-label={collapsed ? 'Navigation ausklappen' : 'Navigation einklappen'}>{collapsed ? <ChevronRight size={17} /> : <ChevronLeft size={17} />}</button>
     <nav aria-label="Hauptnavigation">{items.map(({ id, label, icon: Icon }) => <button key={id} title={collapsed ? label : undefined} className={page === id ? 'active' : ''} onClick={() => onChange(id)}><Icon aria-hidden="true" size={19} strokeWidth={1.8} /><span>{label}</span></button>)}</nav>
-    <div className="sidebar-footer"><img src={logo} alt="AKZENTA Immobilien" /><span>Version 0.7.2</span></div>
+    <div className="sidebar-footer"><img src={logo} alt="AKZENTA Immobilien" /><span>Version 0.8</span></div>
   </aside>
 }
