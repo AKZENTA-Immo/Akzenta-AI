@@ -1,5 +1,6 @@
 import { Bot, Database, FileText, Layers3, UserRound } from 'lucide-react'
 import type { ChatStatus, KnowledgeStatus } from '../models/api'
+import logo from '../assets/akzenta-logo-original.png'
 
 export function AppHeader({ chat, knowledge }: { chat: ChatStatus | null; knowledge: KnowledgeStatus | null }) {
   const cards = [
@@ -9,5 +10,5 @@ export function AppHeader({ chat, knowledge }: { chat: ChatStatus | null; knowle
     { label: 'Abschnitte', value: knowledge?.gespeicherte_abschnitte?.toLocaleString('de-DE') ?? '–', icon: Layers3 },
     { label: 'Benutzer', value: 'Lokal', icon: UserRound },
   ]
-  return <header className="app-header" aria-label="Systemstatus">{cards.map(({ label, value, icon: Icon }) => <div className="header-status" key={label}><Icon size={17} /><span><small>{label}</small><strong>{value}</strong></span></div>)}</header>
+  return <header className="app-header"><div className="header-logo"><img src={logo} alt="AKZENTA Immobilien" /></div><div className="header-status-list" aria-label="Systemstatus">{cards.map(({ label, value, icon: Icon }) => <div className="header-status" key={label}><Icon size={17} /><span><small>{label}</small><strong>{value}</strong></span></div>)}</div></header>
 }

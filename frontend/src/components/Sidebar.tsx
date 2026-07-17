@@ -1,5 +1,5 @@
 import { BarChart3, Bot, Building2, ChevronLeft, ChevronRight, FileText, Home, Lightbulb, Megaphone, Phone, Settings, Users } from 'lucide-react'
-import logo from '../assets/akzenta-logo.svg'
+import logo from '../assets/akzenta-logo-original.png'
 
 export type Page = 'dashboard' | 'chat' | 'knowledge' | 'documents' | 'sellers' | 'objects' | 'leads' | 'marketing' | 'phone' | 'settings'
 
@@ -15,9 +15,9 @@ interface SidebarProps { page: Page; collapsed: boolean; onChange: (page: Page) 
 
 export function Sidebar({ page, collapsed, onChange, onToggle }: SidebarProps) {
   return <aside className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''}`}>
-    <div className="sidebar-brand"><img src={logo} alt="AKZENTA Immobilien" />{!collapsed && <div><strong>AKZENTA AI</strong><small>Interner Immobilien-Assistent</small></div>}</div>
+    <div className="sidebar-brand"><div><strong>AKZENTA AI</strong><small>Interner Immobilien-Assistent</small></div></div>
     <button className="sidebar-toggle" onClick={onToggle} aria-label={collapsed ? 'Navigation ausklappen' : 'Navigation einklappen'}>{collapsed ? <ChevronRight size={17} /> : <ChevronLeft size={17} />}</button>
     <nav aria-label="Hauptnavigation">{items.map(({ id, label, icon: Icon }) => <button key={id} title={collapsed ? label : undefined} className={page === id ? 'active' : ''} onClick={() => onChange(id)}><Icon aria-hidden="true" size={19} strokeWidth={1.8} /><span>{label}</span></button>)}</nav>
-    <div className="sidebar-footer"><img src={logo} alt="" /><span>Version 0.7.1</span></div>
+    <div className="sidebar-footer"><img src={logo} alt="AKZENTA Immobilien" /><span>Version 0.7.2</span></div>
   </aside>
 }
