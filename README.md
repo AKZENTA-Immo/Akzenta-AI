@@ -1,9 +1,21 @@
-# AKZENTA AI – Version 0.6.1
+# AKZENTA AI – Version 0.7
 
 Lokale FastAPI-Anwendung mit read-only Dokumentzugriff auf die konfigurierte
 Dropbox und einer persistenten semantischen Wissensbasis in ChromaDB. Embeddings
 werden ausschließlich lokal durch Ollama erzeugt; Cloud-Embedding-Dienste kommen
 nicht zum Einsatz.
+
+Version 0.7 ergänzt eine lokale Weboberfläche mit React, TypeScript und Vite.
+Sie bietet den Dokumentenchat mit aufklappbaren Quellen sowie Status und manuelle
+Aktualisierung der Wissensbasis. Dokumente und Einstellungen sind als Bereiche
+für spätere Versionen vorbereitet.
+
+## Architektur
+
+- `backend`: FastAPI, Dokumentleser, Ollama, ChromaDB und Dokumentenchat
+- `frontend`: React 19, TypeScript im Strict Mode, Vite und zentrale Fetch-API
+- `data/chroma`: ausschließlich lokaler, persistenter Vektorindex
+- Dropbox: nur lesbare Quelldokumente; niemals Ziel für Anwendungsdaten
 
 ## Installation unter Windows
 
@@ -35,6 +47,7 @@ $env:OLLAMA_CHAT_URL = "http://localhost:11434/api/chat"
 $env:OLLAMA_REQUEST_TIMEOUT = "180"
 $env:CHAT_MAX_CONTEXT_CHARS = "12000"
 $env:CHAT_MIN_RELEVANCE = "0.25"
+$env:AKZENTA_ALLOWED_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
 python -m uvicorn backend.main:app --host 127.0.0.1 --port 8011 --reload
 ```
 
@@ -105,6 +118,40 @@ Diese Einstellung verbessert nur die Konsolendarstellung. Bereits fehlerhaft
 gespeicherte Indextexte werden dadurch nicht repariert; dafür ist der oben
 beschriebene vollständige Reindex erforderlich.
 
+## Weboberfläche starten
+
+In einem zweiten PowerShell-Fenster:
+
+```powershell
+cd C:\KI-Projekte\Akzenta-AI\frontend
+$env:VITE_API_BASE_URL = "http://127.0.0.1:8011"
+npm install
+npm run dev
+```
+
+Danach ist die Oberfläche unter `http://127.0.0.1:5173` erreichbar. Falls die
+PowerShell-Ausführungsrichtlinie `npm.ps1` blockiert, können dieselben Befehle
+mit `npm.cmd` ausgeführt werden.
+
+Die Oberfläche besteht aus einer anthrazitfarbenen linken Navigation und einem
+hellen Arbeitsbereich. Die Chat-Seite bietet Beispielfragen, ein großes
+Eingabefeld, sicher gerenderte Markdown-Antworten und kompakte, aufklappbare
+Quellenkarten. Die Wissensbasis-Seite zeigt farblich unterscheidbare
+Systemzustände, Indexdetails und das Ergebnis einer manuell gestarteten
+Aktualisierung. Das Layout passt sich Tablet- und Smartphonebreiten an.
+
+### CORS
+
+Das Backend erlaubt standardmäßig ausschließlich die lokalen Frontend-Ursprünge
+`http://localhost:5173` und `http://127.0.0.1:5173`. Weitere lokale Ursprünge
+können kommasepariert gesetzt werden:
+
+```powershell
+$env:AKZENTA_ALLOWED_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
+```
+
+Es wird bewusst keine globale `*`-Freigabe verwendet.
+
 Antworten nennen verwendete Dokumentstellen mit `[Quelle 1]`, `[Quelle 2]` usw.
 Nicht belegbare Fragen werden ausdrücklich als nicht eindeutig in der
 AKZENTA-Wissensbasis auffindbar beantwortet. Dokumentinhalte gelten als nicht
@@ -120,6 +167,27 @@ cd C:\KI-Projekte\Akzenta-AI
 backend\.venv\Scripts\Activate.ps1
 python -m pytest -v
 ```
+
+Frontend-Tests und Produktions-Build:
+
+```powershell
+cd C:\KI-Projekte\Akzenta-AI\frontend
+npm test
+npm run build
+```
+
+## Fehlerbehebung
+
+- **Backend nicht erreichbar:** Prüfen, ob Uvicorn auf Port 8011 läuft und
+  `VITE_API_BASE_URL` korrekt gesetzt wurde.
+- **Chat nicht bereit:** `GET /chat/status` prüfen und bei Bedarf
+  `ollama pull llama3` sowie `ollama pull nomic-embed-text` ausführen.
+- **Wissensbasis leer:** In der Weboberfläche „Wissensbasis aktualisieren“
+  wählen oder `POST /wissensbasis/indexieren` aufrufen.
+- **Browser meldet CORS:** Den exakten lokalen Frontend-Ursprung in
+  `AKZENTA_ALLOWED_ORIGINS` ergänzen und das Backend neu starten.
+- **Anfrage dauert lange:** Lokale Modellantworten können je nach Hardware
+  mehrere Minuten benötigen. Das Frontend zeigt währenddessen einen Ladezustand.
 
 ## Datenschutz, Sicherheit und bekannte Einschränkungen
 
@@ -142,3 +210,7 @@ python -m pytest -v
 - Prompt-Injection wird durch Systemregeln, Datengrenzen und Ausgabefilter
   reduziert, kann bei lokalen Sprachmodellen aber nicht mathematisch garantiert
   ausgeschlossen werden.
+- Die Weboberfläche verwaltet derzeit nur Chat und Wissensbasis vollständig;
+  Dokumentverwaltung und Einstellungen folgen in späteren Versionen.
+- Chatverläufe werden nicht dauerhaft im Browser gespeichert. Ein Neuladen der
+  Seite verwirft die aktuell angezeigte Antwort.

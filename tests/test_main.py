@@ -116,3 +116,18 @@ def test_fehlender_ordner(tmp_path, monkeypatch):
     antwort = TestClient(app).get("/dokumente")
     assert antwort.status_code == 503
     assert str(tmp_path) not in antwort.text
+
+
+def test_cors_erlaubt_nur_konfigurierte_lokale_frontends():
+    client = TestClient(app)
+    erlaubt = client.options(
+        "/chat/status",
+        headers={"Origin": "http://localhost:5173", "Access-Control-Request-Method": "GET"},
+    )
+    fremd = client.options(
+        "/chat/status",
+        headers={"Origin": "https://fremde-domain.example", "Access-Control-Request-Method": "GET"},
+    )
+    assert erlaubt.status_code == 200
+    assert erlaubt.headers["access-control-allow-origin"] == "http://localhost:5173"
+    assert "access-control-allow-origin" not in fremd.headers
