@@ -78,6 +78,7 @@ def test_fehlerhafte_datei_und_lesestatus(dropbox):
     antwort = TestClient(app).get("/dokumente/lesestatus")
     assert antwort.status_code == 200
     assert antwort.json()["nach_dateityp"][".pdf"]["fehlerhaft"] == 1
+    assert antwort.json()["fehler_nach_dateityp"] == {".pdf": 1}
 
 
 def test_fehler_endpunkt_listet_nur_nicht_lesbare_dokumente(dropbox):
@@ -95,6 +96,7 @@ def test_fehler_endpunkt_listet_nur_nicht_lesbare_dokumente(dropbox):
         {
             "dokument_id": dokument_id("Unterordner/kaputt.docx"),
             "pfad": "Unterordner/kaputt.docx",
+            "dateiname": "kaputt.docx",
             "dateiendung": ".docx",
             "fehlermeldung": "Word-Dokument konnte nicht gelesen werden. Die Datei ist möglicherweise beschädigt oder nicht unterstützt.",
         }

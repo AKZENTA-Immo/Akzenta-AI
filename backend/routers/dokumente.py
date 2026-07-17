@@ -55,7 +55,17 @@ def lesestatus():
         except DokumentLesefehler:
             status[datei.suffix.lower()]["fehlerhaft"] += 1
     gesamt = {"erfolgreich": sum(v["erfolgreich"] for v in status.values()), "fehlerhaft": sum(v["fehlerhaft"] for v in status.values())}
-    return {"status": "ok", "gesamt": gesamt, "nach_dateityp": dict(sorted(status.items()))}
+    fehler_nach_dateityp = {
+        endung: werte["fehlerhaft"]
+        for endung, werte in sorted(status.items())
+        if werte["fehlerhaft"] > 0
+    }
+    return {
+        "status": "ok",
+        "gesamt": gesamt,
+        "nach_dateityp": dict(sorted(status.items())),
+        "fehler_nach_dateityp": fehler_nach_dateityp,
+    }
 
 
 @router.get("/fehler")
@@ -70,6 +80,7 @@ def fehlerhafte_dokumente():
                 {
                     "dokument_id": daten["id"],
                     "pfad": daten["pfad"],
+                    "dateiname": daten["name"],
                     "dateiendung": daten["endung"],
                     "fehlermeldung": str(exc),
                 }

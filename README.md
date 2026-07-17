@@ -27,8 +27,8 @@ Ollama ist für `/immobilien-text` erforderlich und kann über `OLLAMA_URL` und
 
 - `GET /dokumente` – gefilterte Dokumentliste mit stabilen IDs und relativen Pfaden
 - `GET /dokumente/statistik` – Verteilung nach Dateityp und Hauptordner
-- `GET /dokumente/lesestatus` – erfolgreiche und fehlerhafte Leseversuche je Dateityp
-- `GET /dokumente/fehler` – ausschließlich nicht lesbare Dokumente mit sicherer Fehlerdiagnose
+- `GET /dokumente/lesestatus` – erfolgreiche Leseversuche und eine separate Fehlerzahl je Dateityp
+- `GET /dokumente/fehler` – ausschließlich nicht lesbare Dokumente mit Dateiname und sicherer Fehlerdiagnose
 - `GET /dokumente/{dokument_id}` – Metadaten und höchstens 3.000 Zeichen Vorschau
 - `GET /dokumente/{dokument_id}/text` – vollständig extrahierter Text
 
