@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from 'react'
 import type { ChatResponse } from '../models/api'
 import { sendDocumentQuestion } from '../services/api'
 import { ChatInput } from '../components/ChatInput'
