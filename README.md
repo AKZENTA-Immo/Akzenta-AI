@@ -1,4 +1,9 @@
-# AKZENTA AI – Version 0.8
+# AKZENTA AI – Version 0.9
+
+Version 0.9 ergänzt Phase 1 der sicheren Agentenarchitektur: CRM-Vorschauen,
+E-Mail-Entwürfe und Terminsimulationen. Alle Anbieter sind standardmäßig nicht
+verbundene Mock-Adapter; externe Aktionen sind technisch deaktiviert. Details,
+API-Endpunkte und Sicherheitsgrenzen stehen in `docs/phase-1-agenten.md`.
 
 Lokale FastAPI-Anwendung mit read-only Dokumentzugriff auf die konfigurierte
 Dropbox und einer persistenten semantischen Wissensbasis in ChromaDB. Embeddings

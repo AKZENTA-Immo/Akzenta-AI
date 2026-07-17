@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 
-VERSION = "0.8"
+VERSION = "0.9"
 PROJECT_PATH = Path(__file__).resolve().parent.parent
 DROPBOX_PATH = Path(os.getenv("AKZENTA_DROPBOX_PATH", r"C:\Users\S. Vedder\Dropbox\AKZENTA AI"))
 CHROMA_PATH = Path(os.getenv("AKZENTA_CHROMA_PATH", str(PROJECT_PATH / "data" / "chroma")))
@@ -28,3 +28,5 @@ RELEVANTE_ENDUNGEN = frozenset({".pdf", ".docx", ".xlsx", ".txt", ".pptx", ".pps
 VORSCHAU_ZEICHEN = 3000
 ABSCHNITT_ZEICHEN = int(os.getenv("AKZENTA_CHUNK_SIZE", "1000"))
 ABSCHNITT_UEBERLAPPUNG = int(os.getenv("AKZENTA_CHUNK_OVERLAP", "150"))
+AGENT_MOCK_MODE = os.getenv("AKZENTA_AGENT_MOCK_MODE", "true").lower() == "true"
+AGENT_AUDIT_LOG = Path(os.getenv("AKZENTA_AGENT_AUDIT_LOG", str(PROJECT_PATH / "data" / "agent-audit.jsonl")))
