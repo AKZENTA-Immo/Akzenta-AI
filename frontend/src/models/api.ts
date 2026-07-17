@@ -1,3 +1,9 @@
+export interface BackendInfo {
+  status: string
+  branche: string
+  version: string
+}
+
 export interface ChatRequest {
   frage: string
   limit?: number
