@@ -58,6 +58,25 @@ def lesestatus():
     return {"status": "ok", "gesamt": gesamt, "nach_dateityp": dict(sorted(status.items()))}
 
 
+@router.get("/fehler")
+def fehlerhafte_dokumente():
+    fehler = []
+    for datei in _dateien():
+        try:
+            lese_dokument(datei)
+        except DokumentLesefehler as exc:
+            daten = metadaten(datei)
+            fehler.append(
+                {
+                    "dokument_id": daten["id"],
+                    "pfad": daten["pfad"],
+                    "dateiendung": daten["endung"],
+                    "fehlermeldung": str(exc),
+                }
+            )
+    return {"status": "ok", "anzahl": len(fehler), "dokumente": fehler}
+
+
 @router.get("/{dokument_id}/text")
 def dokument_text(dokument_id: str):
     datei = _holen(dokument_id)

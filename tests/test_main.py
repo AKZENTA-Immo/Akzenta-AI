@@ -80,6 +80,35 @@ def test_fehlerhafte_datei_und_lesestatus(dropbox):
     assert antwort.json()["nach_dateityp"][".pdf"]["fehlerhaft"] == 1
 
 
+def test_fehler_endpunkt_listet_nur_nicht_lesbare_dokumente(dropbox):
+    (dropbox / "lesbar.txt").write_text("Inhalt", encoding="utf-8")
+    kaputt = dropbox / "Unterordner" / "kaputt.docx"
+    kaputt.parent.mkdir()
+    kaputt.write_bytes(b"kein Word-Dokument")
+
+    antwort = TestClient(app).get("/dokumente/fehler")
+
+    assert antwort.status_code == 200
+    inhalt = antwort.json()
+    assert inhalt["anzahl"] == 1
+    assert inhalt["dokumente"] == [
+        {
+            "dokument_id": dokument_id("Unterordner/kaputt.docx"),
+            "pfad": "Unterordner/kaputt.docx",
+            "dateiendung": ".docx",
+            "fehlermeldung": "Word-Dokument konnte nicht gelesen werden. Die Datei ist möglicherweise beschädigt oder nicht unterstützt.",
+        }
+    ]
+    assert str(dropbox) not in antwort.text
+    assert "lesbar.txt" not in antwort.text
+
+
+def test_fehler_endpunkt_ist_keine_dokument_id(dropbox):
+    antwort = TestClient(app).get("/dokumente/fehler")
+    assert antwort.status_code == 200
+    assert antwort.json() == {"status": "ok", "anzahl": 0, "dokumente": []}
+
+
 def test_fehlender_ordner(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "DROPBOX_PATH", tmp_path / "fehlt")
     antwort = TestClient(app).get("/dokumente")

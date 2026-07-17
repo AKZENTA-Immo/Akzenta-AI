@@ -12,6 +12,19 @@ class DokumentLesefehler(Exception):
     pass
 
 
+def _verstaendliche_fehlermeldung(datei: Path) -> str:
+    bezeichnungen = {
+        ".pdf": "PDF-Datei",
+        ".docx": "Word-Dokument",
+        ".xlsx": "Excel-Arbeitsmappe",
+        ".txt": "Textdatei",
+        ".pptx": "PowerPoint-Präsentation",
+        ".ppsx": "PowerPoint-Bildschirmpräsentation",
+    }
+    bezeichnung = bezeichnungen.get(datei.suffix.lower(), "Dokument")
+    return f"{bezeichnung} konnte nicht gelesen werden. Die Datei ist möglicherweise beschädigt oder nicht unterstützt."
+
+
 def _pdf(pfad: Path) -> str:
     return "\n\n".join((seite.extract_text() or "") for seite in PdfReader(str(pfad)).pages)
 
@@ -67,4 +80,4 @@ def lese_dokument(datei: Path) -> str:
     except DokumentLesefehler:
         raise
     except Exception as exc:
-        raise DokumentLesefehler("Dokument konnte nicht gelesen werden.") from exc
+        raise DokumentLesefehler(_verstaendliche_fehlermeldung(datei)) from exc

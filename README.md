@@ -1,4 +1,4 @@
-# AKZENTA AI – Version 0.4
+# AKZENTA AI – Version 0.4.1
 
 Lokale FastAPI-Anwendung für ein Immobilienmaklerunternehmen in Hamburg. Die
 konfigurierte Dropbox-Wissensbasis wird ausschließlich gelesen. Unterstützt
@@ -28,6 +28,7 @@ Ollama ist für `/immobilien-text` erforderlich und kann über `OLLAMA_URL` und
 - `GET /dokumente` – gefilterte Dokumentliste mit stabilen IDs und relativen Pfaden
 - `GET /dokumente/statistik` – Verteilung nach Dateityp und Hauptordner
 - `GET /dokumente/lesestatus` – erfolgreiche und fehlerhafte Leseversuche je Dateityp
+- `GET /dokumente/fehler` – ausschließlich nicht lesbare Dokumente mit sicherer Fehlerdiagnose
 - `GET /dokumente/{dokument_id}` – Metadaten und höchstens 3.000 Zeichen Vorschau
 - `GET /dokumente/{dokument_id}/text` – vollständig extrahierter Text
 
@@ -37,6 +38,7 @@ Beispiele:
 Invoke-RestMethod http://127.0.0.1:8010/dokumente
 Invoke-RestMethod http://127.0.0.1:8010/dokumente/statistik
 Invoke-RestMethod http://127.0.0.1:8010/dokumente/lesestatus
+Invoke-RestMethod http://127.0.0.1:8010/dokumente/fehler
 ```
 
 ## Tests
