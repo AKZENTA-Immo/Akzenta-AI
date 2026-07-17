@@ -9,3 +9,6 @@ data/chroma/
 frontend/node_modules/
 frontend/dist/
 *.tsbuildinfo
+
+pytest-temp/
+.pytest_cache/
