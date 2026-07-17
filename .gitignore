@@ -12,3 +12,4 @@ frontend/dist/
 
 pytest-temp/
 .pytest_cache/
+backup/
