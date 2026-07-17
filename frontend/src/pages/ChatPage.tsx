@@ -6,6 +6,12 @@ import { ChatMessage } from '../components/ChatMessage'
 import { ErrorMessage } from '../components/ErrorMessage'
 import { LoadingIndicator } from '../components/LoadingIndicator'
 
+interface ChatHistoryItem {
+  id: string
+  frage: string
+  response: ChatResponse
+}
+
 const suggestions = [
   'Welche Vorteile bietet eine Immobilie als Kapitalanlage?',
   'Welche steuerlichen Vorteile werden in unseren Unterlagen genannt?',
@@ -18,12 +24,28 @@ export function ChatPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [suggestion, setSuggestion] = useState(() => { const value = sessionStorage.getItem('akzenta-document-question') || ''; sessionStorage.removeItem('akzenta-document-question'); return value })
+  const [history, setHistory] = useState<ChatHistoryItem[]>([])
   const endRef = useRef<HTMLDivElement>(null)
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [response, loading])
+  useEffect(() => {
+    endRef.current?.scrollIntoView({
+      behavior: 'smooth'
+    })
+  }, [history, loading])
 
   const submit = async (frage: string) => {
     setLoading(true); setError(''); setSuggestion('')
-    try { setResponse(await sendDocumentQuestion({ frage, limit: 5 })) }
+    try { 
+      const answer = await sendDocumentQuestion({ frage, limit: 5 })
+      setResponse(answer)
+      setHistory(previous => [
+        ...previous,
+        {
+          id: crypto.randomUUID(),
+          frage,
+          response: answer
+        }
+      ])
+    }
     catch (err) { setError(err instanceof Error ? err.message : 'Die Anfrage konnte nicht verarbeitet werden.') }
     finally { setLoading(false) }
   }
@@ -35,8 +57,18 @@ export function ChatPage() {
       {response && <ChatMessage response={response} />}
       {error && <ErrorMessage message={error} />}
       {loading && <LoadingIndicator label="AKZENTA AI durchsucht die Wissensbasis …" />}
+      {history.map(item => (
+        <div key={item.id} className="conversation">
+          <div className="user-question">
+            <strong>Sie</strong>
+            <p>{item.frage}</p>
+          </div>
+          <ChatMessage response={item.response} />
+        </div>
+      ))}
       <ChatInput onSubmit={submit} loading={loading} initialValue={suggestion} />
       <p className="basis-hint">Antworten basieren ausschließlich auf der internen AKZENTA-Wissensbasis.</p>
+      <button type="button" onClick={() => setHistory([])}>Chat leeren</button>
       <div ref={endRef} />
     </div>
   )
