@@ -4,11 +4,13 @@ from fastapi import FastAPI, HTTPException
 from backend import config
 from backend.routers.dokumente import router as dokumente_router
 from backend.routers.wissensbasis import router as wissensbasis_router
+from backend.routers.chat import router as chat_router
 
 
 app = FastAPI(title="AKZENTA AI", version=config.VERSION)
 app.include_router(dokumente_router)
 app.include_router(wissensbasis_router)
+app.include_router(chat_router)
 
 
 @app.get("/")
