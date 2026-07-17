@@ -47,6 +47,7 @@ class OllamaChatService:
                 timeout=self.timeout,
             )
             antwort.raise_for_status()
+            antwort.encoding = "utf-8"
             daten = antwort.json()
         except requests.Timeout as exc:
             raise OllamaTimeout("Zeitüberschreitung bei der lokalen Antwortgenerierung durch Ollama.") from exc

@@ -9,6 +9,7 @@ from backend.services.chroma_service import ChromaFehler, ChromaService
 from backend.services.dokument_reader import DokumentLesefehler, lese_dokument
 from backend.services.dokument_scanner import metadaten, relevante_dokumente
 from backend.services.embedding_service import EmbeddingFehler, OllamaEmbeddingService
+from backend.services.text_normalizer import normalize_unicode_text
 
 
 def teile_text(text: str, groesse: int = 1000, ueberlappung: int = 150) -> Iterator[str]:
@@ -58,11 +59,14 @@ class IndexService:
         self.chroma = chroma or ChromaService()
         self.embeddings = embeddings or OllamaEmbeddingService()
 
-    def indexiere(self) -> dict:
+    def indexiere(self, vollstaendig: bool = False) -> dict:
         begonnen = time.perf_counter()
         dateien = relevante_dokumente()
         alter_status = self.chroma.lade_status()
         alt = alter_status.get("dokumente", {})
+        if vollstaendig:
+            self.chroma.leere_collection()
+            alt = {}
         neu_status = dict(alt)
         aktuelle_ids = set()
         zaehler = {"neu_indexiert": 0, "aktualisiert": 0, "unveraendert": 0, "entfernt": 0, "fehlerhaft": 0}
@@ -77,7 +81,7 @@ class IndexService:
                 if alt.get(doc_id, {}).get("fingerabdruck") == fingerprint:
                     zaehler["unveraendert"] += 1
                     continue
-                text = lese_dokument(datei)
+                text = normalize_unicode_text(lese_dokument(datei))
                 anzahl_abschnitte = 0
                 batch_ids, batch_texte, batch_metadaten = [], [], []
                 for nummer, (abschnitt, quelle) in enumerate(

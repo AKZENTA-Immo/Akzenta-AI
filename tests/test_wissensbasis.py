@@ -53,6 +53,10 @@ class FakeChroma:
     def anzahl_abschnitte(self):
         return len(self.eintraege)
 
+    def leere_collection(self):
+        self.eintraege = {}
+        self.status = {"dokumente": {}, "letzte_indexierung": None}
+
 
 @pytest.fixture
 def test_dropbox(tmp_path, monkeypatch):
@@ -100,6 +104,8 @@ def test_indexierung_mit_lokaler_chromadb(test_dropbox, tmp_path):
     assert ergebnis["neu_indexiert"] == 1
     assert chroma.anzahl_abschnitte() > 0
     assert (tmp_path / "chroma" / "index_state.json").exists()
+    neuaufbau = IndexService(chroma, FakeEmbeddings()).indexiere(vollstaendig=True)
+    assert neuaufbau["neu_indexiert"] == 1
 
 
 def test_unveraendertes_dokument_wird_uebersprungen(test_dropbox):
@@ -110,6 +116,16 @@ def test_unveraendertes_dokument_wird_uebersprungen(test_dropbox):
     ergebnis = service.indexiere()
     assert ergebnis["unveraendert"] == 1
     assert ergebnis["neu_indexiert"] == 0
+
+
+def test_vollstaendiger_reindex_indexiert_unveraenderte_datei_neu(test_dropbox):
+    (test_dropbox / "gleich.txt").write_text("abcdefghijk", encoding="utf-8")
+    chroma = FakeChroma()
+    service = IndexService(chroma, FakeEmbeddings())
+    service.indexiere()
+    ergebnis = service.indexiere(vollstaendig=True)
+    assert ergebnis["neu_indexiert"] == 1
+    assert ergebnis["unveraendert"] == 0
 
 
 def test_geaendertes_dokument_wird_aktualisiert(test_dropbox):

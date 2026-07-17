@@ -22,6 +22,7 @@ class OllamaEmbeddingService:
                 timeout=120,
             )
             antwort.raise_for_status()
+            antwort.encoding = "utf-8"
             daten = antwort.json()
         except requests.ConnectionError as exc:
             raise EmbeddingFehler("Ollama ist für Embeddings nicht erreichbar.") from exc

@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 
-VERSION = "0.6"
+VERSION = "0.6.1"
 PROJECT_PATH = Path(__file__).resolve().parent.parent
 DROPBOX_PATH = Path(os.getenv("AKZENTA_DROPBOX_PATH", r"C:\Users\S. Vedder\Dropbox\AKZENTA AI"))
 CHROMA_PATH = Path(os.getenv("AKZENTA_CHROMA_PATH", str(PROJECT_PATH / "data" / "chroma")))

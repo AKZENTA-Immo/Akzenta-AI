@@ -27,9 +27,9 @@ def _formatiere_treffer(treffer: dict) -> dict:
 
 
 @router.post("/indexieren")
-def indexieren():
+def indexieren(vollstaendig: bool = False):
     try:
-        return IndexService().indexiere()
+        return IndexService().indexiere(vollstaendig=vollstaendig)
     except (ChromaFehler, EmbeddingFehler, DokumentPfadFehler) as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 

@@ -6,6 +6,7 @@ from pypdf import PdfReader
 from pptx import Presentation
 
 from backend.services.dokument_scanner import sicherer_pfad
+from backend.services.text_normalizer import normalize_unicode_text
 
 
 class DokumentLesefehler(Exception):
@@ -67,15 +68,16 @@ def lese_dokument(datei: Path) -> str:
         pfad = sicherer_pfad(datei)
         endung = pfad.suffix.lower()
         if endung == ".txt":
-            return pfad.read_text(encoding="utf-8-sig", errors="replace")
+            text = pfad.read_text(encoding="utf-8-sig", errors="replace")
+            return normalize_unicode_text(text)
         if endung == ".pdf":
-            return _pdf(pfad)
+            return normalize_unicode_text(_pdf(pfad))
         if endung == ".docx":
-            return _docx(pfad)
+            return normalize_unicode_text(_docx(pfad))
         if endung == ".xlsx":
-            return _xlsx(pfad)
+            return normalize_unicode_text(_xlsx(pfad))
         if endung in {".pptx", ".ppsx"}:
-            return _praesentation(pfad)
+            return normalize_unicode_text(_praesentation(pfad))
         raise DokumentLesefehler("Nicht unterstützter Dateityp.")
     except DokumentLesefehler:
         raise

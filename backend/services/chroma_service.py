@@ -66,6 +66,15 @@ class ChromaService:
         except Exception as exc:
             raise ChromaFehler("Alte Dokumentabschnitte konnten nicht entfernt werden.") from exc
 
+    def leere_collection(self) -> None:
+        try:
+            collection = self.collection()
+            ids = collection.get(include=[]).get("ids", [])
+            for start in range(0, len(ids), 1000):
+                collection.delete(ids=ids[start:start + 1000])
+        except Exception as exc:
+            raise ChromaFehler("Die lokale Wissensbasis konnte nicht für den Neuaufbau geleert werden.") from exc
+
     def suche(self, embedding: list[float], limit: int) -> list[dict]:
         try:
             ergebnis = self.collection().query(

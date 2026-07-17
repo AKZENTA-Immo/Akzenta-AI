@@ -1,4 +1,4 @@
-# AKZENTA AI – Version 0.6
+# AKZENTA AI – Version 0.6.1
 
 Lokale FastAPI-Anwendung mit read-only Dokumentzugriff auf die konfigurierte
 Dropbox und einer persistenten semantischen Wissensbasis in ChromaDB. Embeddings
@@ -58,6 +58,14 @@ Invoke-RestMethod http://127.0.0.1:8011/wissensbasis/status
 Invoke-RestMethod "http://127.0.0.1:8011/wissensbasis/suche?q=Kapitalanlage&limit=5"
 ```
 
+Nach dem Update auf 0.6.1 sollte der bestehende Index einmal vollständig und
+sicher neu aufgebaut werden. Dabei wird ausschließlich `data/chroma` ersetzt;
+die Dropbox bleibt unverändert:
+
+```powershell
+Invoke-RestMethod -Method Post "http://127.0.0.1:8011/wissensbasis/indexieren?vollstaendig=true"
+```
+
 Die bestehenden Dokument-Endpunkte bleiben unter `/dokumente` verfügbar,
 einschließlich `/dokumente/fehler` und `/dokumente/lesestatus`.
 
@@ -82,6 +90,20 @@ Invoke-RestMethod -Method Post `
 
 Invoke-RestMethod http://127.0.0.1:8011/chat/status
 ```
+
+Für korrekte Umlaute und Sonderzeichen in Windows PowerShell empfiehlt sich vor
+den API-Aufrufen:
+
+```powershell
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new()
+$OutputEncoding = [System.Text.UTF8Encoding]::new()
+# Optional in älteren Konsolen:
+chcp 65001
+```
+
+Diese Einstellung verbessert nur die Konsolendarstellung. Bereits fehlerhaft
+gespeicherte Indextexte werden dadurch nicht repariert; dafür ist der oben
+beschriebene vollständige Reindex erforderlich.
 
 Antworten nennen verwendete Dokumentstellen mit `[Quelle 1]`, `[Quelle 2]` usw.
 Nicht belegbare Fragen werden ausdrücklich als nicht eindeutig in der
