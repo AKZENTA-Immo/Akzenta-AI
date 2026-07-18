@@ -4,14 +4,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ChatPage } from '../pages/ChatPage'
 import * as api from '../services/api'
 
-vi.mock('../services/api', () => ({ sendDocumentQuestion: vi.fn(), routeAgentMessage: vi.fn() }))
+vi.mock('../services/api', () => ({ sendDocumentQuestion: vi.fn(), routeAgentMessage: vi.fn(), executeAgentMessage: vi.fn() }))
 const send = vi.mocked(api.sendDocumentQuestion)
 const route = vi.mocked(api.routeAgentMessage)
+const execute = vi.mocked(api.executeAgentMessage)
 
 describe('ChatPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    route.mockResolvedValue({ agent: 'dokumente', confidence: .9, reason: 'Dokumenten-Schlüsselwörter erkannt', original_message: 'Frage', simulation: true, result: { status: 'simulated', external_action_executed: false } })
+    route.mockResolvedValue({ agent: 'dokumente', confidence: .9, reason: 'Dokumenten-Schlüsselwörter erkannt', original_message: 'Frage', simulation: true, uncertain: false, result: { status: 'simulated', external_action_executed: false } })
+    execute.mockResolvedValue({ agent: 'dokumente', intent: 'dokumentenanfrage', confidence: .9, reasoning: 'Dokumenten-Schlüsselwörter erkannt', simulation: true, approval_required: true, status: 'simulated', result: { query: 'Frage' }, missing_information: [], proposed_actions: ['Dokumentenchat verwenden'], warnings: ['Simulation: keine externe Aktion.'], uncertain: false })
   })
 
   it('wird mit Beispielfragen geladen', () => {
@@ -35,10 +37,11 @@ describe('ChatPage', () => {
     })
     await waitFor(() => expect(screen.getByText('Inflationsschutz', { selector: 'strong' })).toBeInTheDocument())
     expect(screen.getByText('Leitfaden.pdf')).toBeInTheDocument()
-    expect(screen.getByLabelText('Agenten-Zuordnung')).toHaveTextContent('Agent: dokumente')
-    expect(screen.getByLabelText('Agenten-Zuordnung')).toHaveTextContent('Simulation aktiv')
+    expect(screen.getByLabelText('Agentenausführung')).toHaveTextContent('Agent ausgeführt')
+    expect(screen.getByLabelText('Agentenausführung')).toHaveTextContent('Simulation aktiv')
+    expect(screen.getByLabelText('Agentenausführung')).toHaveTextContent('Freigabe erforderlich')
     expect(send).toHaveBeenCalledWith({ frage: 'Welche Vorteile gibt es?', limit: 5 })
-    expect(route).toHaveBeenCalledWith('Welche Vorteile gibt es?', true)
+    expect(execute).toHaveBeenCalledWith('Welche Vorteile gibt es?', true)
   })
 
   it('zeigt Backend-Fehler verständlich an', async () => {

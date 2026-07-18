@@ -84,5 +84,6 @@ export interface DocumentStatistics { gesamt: number; nach_dateityp: Record<stri
 export type AgentKind = 'crm' | 'email' | 'calendar'
 export interface AgentStatus { agent: AgentKind; mode: 'mock' | 'draft' | 'simulation' | 'connected'; provider: string; provider_connected: boolean; external_actions_enabled: boolean; prompt_version: string; capabilities: string[] }
 export interface AgentResponse { request_id: string; agent: AgentKind; status: 'draft' | 'simulation' | 'blocked'; summary: string; output: Record<string, unknown>; approval: { required: boolean; approved: boolean; approval_id: string; reason: string }; external_action_executed: boolean; created_at: string }
-export type AgentManagerTarget = 'crm' | 'email' | 'kalender' | 'dokumente' | 'immobilien_text' | 'allgemein'
-export interface AgentManagerResponse { agent: AgentManagerTarget; confidence: number; reason: string; original_message: string; simulation: boolean; result: { status: 'simulated' | 'blocked'; external_action_executed: boolean } }
+export type AgentManagerTarget = 'crm' | 'email' | 'kalender' | 'whatsapp' | 'telefon' | 'marketing' | 'dokumente' | 'immobilien_text' | 'allgemein'
+export interface AgentManagerResponse { agent: AgentManagerTarget; confidence: number; reason: string; original_message: string; simulation: boolean; uncertain: boolean; result: { status: string; external_action_executed: boolean } }
+export interface AgentExecutionResponse { agent: AgentManagerTarget; intent: string; confidence: number; reasoning: string; simulation: boolean; approval_required: boolean; status: 'simulated' | 'blocked' | 'error'; result: Record<string, unknown>; missing_information: string[]; proposed_actions: string[]; warnings: string[]; uncertain: boolean }

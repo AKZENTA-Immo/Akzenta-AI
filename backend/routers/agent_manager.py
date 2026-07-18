@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
-from backend.agents.agent_manager import AgentManagerRequest, AgentManagerResult, central_agent_manager
+from backend.agents.agent_manager import AgentExecutionResponse, AgentManagerRequest, AgentManagerResult, central_agent_manager
 
 router = APIRouter(prefix="/agent-manager", tags=["Agent Manager"])
 
@@ -10,3 +10,7 @@ def route_agent(request: AgentManagerRequest) -> AgentManagerResult:
         return central_agent_manager.route(request)
     except Exception as exc:
         raise HTTPException(status_code=500, detail="Die Anfrage konnte nicht sicher zugeordnet werden.") from exc
+
+@router.post("/execute", response_model=AgentExecutionResponse)
+def execute_agent(request: AgentManagerRequest) -> AgentExecutionResponse:
+    return central_agent_manager.execute(request)

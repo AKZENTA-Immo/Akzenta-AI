@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import type { AgentManagerResponse, ChatResponse } from '../models/api'
-import { routeAgentMessage, sendDocumentQuestion } from '../services/api'
+import type { AgentExecutionResponse, AgentManagerResponse, ChatResponse } from '../models/api'
+import { executeAgentMessage, sendDocumentQuestion } from '../services/api'
 import { ChatInput } from '../components/ChatInput'
 import { ChatMessage } from '../components/ChatMessage'
 import { ErrorMessage } from '../components/ErrorMessage'
@@ -11,6 +11,7 @@ interface ChatHistoryItem {
   frage: string
   response: ChatResponse
   routing?: AgentManagerResponse
+  execution?: AgentExecutionResponse
 }
 
 const CHAT_STORAGE_KEY = 'akzenta-chat-history'
@@ -91,9 +92,9 @@ export function ChatPage() {
     setSuggestion('')
 
     try {
-      const [answer, routing] = await Promise.all([
+      const [answer, execution] = await Promise.all([
         sendDocumentQuestion({ frage, limit: 5 }),
-        routeAgentMessage(frage, true),
+        executeAgentMessage(frage, true),
       ])
       setHistory((previous) => [
         ...previous,
@@ -101,7 +102,7 @@ export function ChatPage() {
           id: crypto.randomUUID(),
           frage,
           response: answer,
-          routing,
+          execution,
         },
       ])
     } catch (err) {
@@ -188,10 +189,23 @@ export function ChatPage() {
 
           {item.routing && (
             <div className="agent-routing" aria-label="Agenten-Zuordnung">
+              <b>Nur zugeordnet</b>
               <strong>Agent: {item.routing.agent.replace('_', ' ')}</strong>
               <span>{item.routing.reason}</span>
               <span>{item.routing.simulation ? 'Simulation aktiv' : 'Ausführung blockiert'}</span>
             </div>
+          )}
+
+          {item.execution && (
+            <section className="agent-execution" aria-label="Agentenausführung">
+              <header><b>Agent ausgeführt</b><strong>{item.execution.agent.replace('_', ' ')}</strong><span>{Math.round(item.execution.confidence * 100)} % Sicherheit{item.execution.uncertain ? ' · Zuordnung unsicher' : ''}</span></header>
+              <p>{item.execution.reasoning}</p>
+              <div className="agent-simulation-label">Simulation aktiv · {item.execution.approval_required ? 'Freigabe erforderlich' : 'Keine Freigabe erforderlich'}</div>
+              <pre>{JSON.stringify(item.execution.result, null, 2)}</pre>
+              {item.execution.missing_information.length > 0 && <div><b>Fehlende Angaben</b><ul>{item.execution.missing_information.map(value => <li key={value}>{value}</li>)}</ul></div>}
+              {item.execution.proposed_actions.length > 0 && <div><b>Geplante Aktionen</b><ul>{item.execution.proposed_actions.map(value => <li key={value}>{value}</li>)}</ul></div>}
+              {item.execution.warnings.map(value => <small key={value}>{value}</small>)}
+            </section>
           )}
 
           <div className="conversation-actions">

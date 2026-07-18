@@ -4,6 +4,10 @@
 
 Phase 1 stellt CRM-, E-Mail- und Termin-Agent bereit. CRM erzeugt ausschließlich Änderungsvorschauen, E-Mail ausschließlich Entwürfe und Termine ausschließlich Simulationen. WhatsApp-, Telefon- und Marketing-Agent folgen in späteren Phasen; die Adaptergrenzen für WhatsApp und Telefon sind bereits vorbereitet.
 
+Seit Version 1.4 orchestriert der Agent Manager zusätzlich sichere lokale
+Simulationen für WhatsApp, Telefon und Marketing. Die vorhandenen Phase-1-
+Endpunkte bleiben kompatibel; es wurden keine externen Provider aktiviert.
+
 Es sind keine Anbieterzugänge hinterlegt. Keine Phase-1-Funktion kann Nachrichten versenden, Termine buchen oder onOffice verändern. Test- und Beispieldaten müssen künstlich sein.
 
 ## Sicherheitsmodell

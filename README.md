@@ -1,4 +1,10 @@
-# AKZENTA AI – Version 1.3
+# AKZENTA AI – Version 1.4
+
+Version 1.4 ergänzt die sichere simulierte Agentenausführung. Der Agent Manager
+unterstützt CRM, E-Mail, Termin, WhatsApp, Telefon, Marketing, Dokumente,
+Immobilientext und den allgemeinen Assistenten über eine gemeinsame interne
+Schnittstelle. Jede Ausführung bleibt lokal, markiert vorgesehene externe
+Schritte als freigabepflichtig und verändert keine Drittsysteme.
 
 Version 1.3 ergänzt einen zentralen Agent Manager. Er klassifiziert Anfragen
 lokal und deterministisch als `crm`, `email`, `kalender`, `dokumente`,
@@ -7,7 +13,9 @@ Anfrage den gewählten Agenten, die Begründung und den Simulationsstatus.
 
 ## Agent Manager
 
-`POST /agent-manager/route` nimmt eine Nachricht und einen optionalen
+`POST /agent-manager/route` klassifiziert ausschließlich. Der neue Endpunkt
+`POST /agent-manager/execute` klassifiziert und ruft den passenden lokalen
+Simulationsagenten auf. Beide nehmen eine Nachricht und einen optionalen
 Simulationsschalter entgegen:
 
 ```json
@@ -19,15 +27,26 @@ Simulationsschalter entgegen:
 
 Weitere Beispiele sind „Aktualisiere den CRM-Kontakt“, „Suche das PDF in der
 Wissensbasis“, „Plane einen Besichtigungstermin“ und „Erstelle einen Exposétext“.
-Die Antwort enthält Agent, Konfidenz, kurze Begründung, Originalnachricht,
-Simulationsstatus und ein strukturiertes Ergebnis.
+Die Ausführungsantwort enthält `agent`, `intent`, `confidence`, `reasoning`,
+`simulation`, `approval_required`, `status`, `result`, `missing_information`,
+`proposed_actions` und `warnings`. Bei mehreren erkannten Anliegen wird eine
+feste Prioritätsregel angewendet und die Zuordnung als unsicher gekennzeichnet.
 
-Das Routing führt grundsätzlich keine externe Aktion aus. Ohne expliziten
-Simulationswert ist die Simulation aktiviert; `simulation: false` blockiert die
-Ausführung ebenfalls. Es werden weder E-Mails versendet noch Kalender oder CRM
-verändert. Spätere Klassifikatoren können über das `MessageClassifier`-Interface
-ergänzt werden. Telefon- und WhatsApp-Agenten sind mögliche spätere Zielklassen,
-werden in Version 1.3 jedoch ausdrücklich nicht angebunden.
+Beispiel für eine sichere Ausführung:
+
+```powershell
+$body = @{ message = "Erstelle eine WhatsApp-Antwort für die Terminbestätigung" } | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8010/agent-manager/execute `
+  -ContentType "application/json" -Body $body
+```
+
+Ohne expliziten Simulationswert ist die Simulation aktiviert; `simulation: false`
+blockiert die Ausführung. Es werden weder E-Mails oder WhatsApp-Nachrichten
+versendet noch Termine erstellt, Anrufe gestartet, CRM-Daten verändert oder
+Marketinginhalte veröffentlicht. Gmail, Google Calendar, WhatsApp, Vapi, Twilio
+und onOffice sind nicht angeschlossen. Spätere Klassifikatoren können über das
+`MessageClassifier`-Interface und neue Simulationen über `SimulatedAgent`
+ergänzt werden.
 
 Version 0.9 ergänzt Phase 1 der sicheren Agentenarchitektur: CRM-Vorschauen,
 E-Mail-Entwürfe und Terminsimulationen. Alle Anbieter sind standardmäßig nicht
