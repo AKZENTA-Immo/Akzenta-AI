@@ -107,10 +107,75 @@ class WorkflowStepResult(BaseModel):
 
 
 class WorkflowCoreResponse(BaseModel):
+    workflow_id: str = Field(default_factory=lambda: f"wf_{uuid4().hex}")
     request_id: str = Field(default_factory=lambda: str(uuid4()))
     agent: Literal["workflow_core"] = "workflow_core"
     status: Literal["completed"] = "completed"
     summary: str
     steps: list[WorkflowStepResult]
     external_action_executed: bool = False
+    approval_required: bool = True
+    approval_status: Literal["pending"] = "pending"
+    workflow_fingerprint: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ApprovalStatus(str, Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    EXPIRED = "expired"
+    EXECUTED = "executed"
+
+
+class ApprovalCreateRequest(BaseModel):
+    workflow_id: str = Field(min_length=1, max_length=100)
+    expires_in_minutes: int = Field(default=30, ge=1, le=1440)
+    requested_by: str | None = Field(default=None, max_length=100)
+
+    @field_validator("workflow_id")
+    @classmethod
+    def strip_workflow_id(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("workflow_id darf nicht leer sein.")
+        return value.strip()
+
+
+class ApprovalDecisionRequest(BaseModel):
+    decision: Literal["approved", "rejected"]
+    decided_by: str | None = Field(default=None, max_length=100)
+    reason: str | None = Field(default=None, max_length=1000)
+
+
+class ApprovalRecord(BaseModel):
+    approval_id: str
+    workflow_id: str
+    status: ApprovalStatus
+    created_at: datetime
+    expires_at: datetime
+    requested_by: str | None = None
+    decided_at: datetime | None = None
+    decided_by: str | None = None
+    reason: str | None = None
+    executed_at: datetime | None = None
+    workflow_fingerprint: str
+
+
+class ApprovalExecutionResponse(BaseModel):
+    approval_id: str
+    workflow_id: str
+    status: Literal["executed"] = "executed"
+    execution_mode: Literal["simulation"] = "simulation"
+    executed_steps: list[str]
+    external_actions_performed: bool = False
+    safe: bool = True
+    message: str
+
+
+class ApprovalStatusResponse(BaseModel):
+    enabled: bool = True
+    mode: Literal["simulation"] = "simulation"
+    persistent: bool = False
+    external_actions_allowed: bool = False
+    supported_statuses: list[ApprovalStatus]
+    safety_guards: list[str]

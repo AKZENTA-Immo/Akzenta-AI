@@ -65,6 +65,41 @@ Beispielrequest:
 
 Ist die Kalendersimulation aktiviert, aber `preferred_start` fehlt, wird die Anfrage mit HTTP 422 abgewiesen. Ohne aktivierte Kalendersimulation werden ausschließlich CRM-Vorschau und E-Mail-Entwurf erzeugt.
 
+## Version 1.7b: Human-in-the-Loop-Freigaben
+
+Jeder erfolgreiche Workflow erhält eine eindeutige `workflow_id`, wird prozesslokal registriert und mit einem SHA-256-Fingerprint über ID, vorbereitete Schritte und Sicherheitsfelder geschützt. Der Ablauf ist: Workflow vorbereiten, Freigabe anfordern, als Mensch genehmigen oder ablehnen und eine genehmigte Fassung einmalig simuliert ausführen.
+
+Status sind `pending`, `approved`, `rejected`, `expired` und `executed`. Nur `pending` kann entschieden werden. Nur eine gültige, nicht abgelaufene `approved`-Freigabe mit unverändertem Workflow-Fingerprint kann ausgeführt werden. Ablehnung, Ablauf, Manipulation und Mehrfachausführung werden blockiert.
+
+| Methode | Endpunkt | Verhalten |
+|---|---|---|
+| GET | `/agents/approvals/status` | Simulationsmodus, Speicher- und Sicherheitsgrenzen |
+| POST | `/agents/approvals` | Freigabe für eine vorhandene `workflow_id` anlegen |
+| GET | `/agents/approvals/{approval_id}` | Aktuellen Status lesen |
+| POST | `/agents/approvals/{approval_id}/decision` | Ausstehende Freigabe genehmigen oder ablehnen |
+| POST | `/agents/approvals/{approval_id}/execute` | Genehmigte Schritte einmalig lokal simulieren |
+
+Beispielablauf (Responses gekürzt):
+
+```http
+POST /agents/workflows/core/run
+{"lead_id":"LEAD-170","recipient_name":"Testperson","target_group":"buyer","purpose":"Weiterer Ablauf"}
+-> {"workflow_id":"wf_...","approval_required":true,"approval_status":"pending","external_action_executed":false}
+
+POST /agents/approvals
+{"workflow_id":"wf_...","expires_in_minutes":30,"requested_by":"steli"}
+-> {"approval_id":"apr_...","status":"pending","workflow_fingerprint":"..."}
+
+POST /agents/approvals/apr_.../decision
+{"decision":"approved","decided_by":"steli","reason":"Entwurf geprüft"}
+-> {"approval_id":"apr_...","status":"approved"}
+
+POST /agents/approvals/apr_.../execute
+-> {"status":"executed","execution_mode":"simulation","external_actions_performed":false,"safe":true}
+```
+
+Der Speicher ist absichtlich nur In-Memory, thread-sicher und nicht persistent: Bei Prozessneustart gehen vorbereitete Workflows und Freigaben verloren; mehrere Serverprozesse teilen den Zustand nicht. Es gibt keine Datenbankmigration und keinen externen Connector. Version 1.7b versendet auch nach Freigabe keine E-Mail, erstellt keinen Kalendertermin und ändert keine CRM-Daten. Eine Freigabe erlaubt ausschließlich die Markierung einer lokalen Simulation als ausgeführt.
+
 ## Fehlerbehandlung
 
 - Pydantic-Validierungsfehler: HTTP 422.

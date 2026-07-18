@@ -1,12 +1,138 @@
-from datetime import timedelta
+import hashlib
+import json
+import logging
+from copy import deepcopy
+from datetime import datetime, timedelta, timezone
+from threading import RLock
+from uuid import uuid4
 
 from backend.adapters.providers import CalendarAdapter, GmailAdapter, OnOfficeAdapter
 from backend.agents.core import AuditLogger, PromptLoader, require_role, safe_facts
 from backend.models.agent_models import (
-    AgentRole, AgentStatus, ApprovalState, CalendarSimulationRequest, CrmPreviewRequest,
+    AgentRole, AgentStatus, ApprovalExecutionResponse, ApprovalRecord, ApprovalState,
+    ApprovalStatus, ApprovalStatusResponse, CalendarSimulationRequest, CrmPreviewRequest,
     EmailDraftRequest, StructuredAgentResponse, WorkflowCoreRequest, WorkflowCoreResponse,
     WorkflowStepResult,
 )
+
+logger = logging.getLogger("akzenta.agents.approvals")
+
+
+class WorkflowNotFound(LookupError): pass
+class ApprovalNotFound(LookupError): pass
+class ApprovalConflict(RuntimeError): pass
+class ApprovalExpired(RuntimeError): pass
+class ApprovalNotApproved(PermissionError): pass
+class ApprovalAlreadyExecuted(RuntimeError): pass
+class WorkflowIntegrityError(RuntimeError): pass
+
+
+class ApprovalService:
+    """Thread-safe, process-local store. All executions are simulations only."""
+
+    def __init__(self, now=None):
+        self._now = now or (lambda: datetime.now(timezone.utc))
+        self._lock = RLock()
+        self._workflows: dict[str, WorkflowCoreResponse] = {}
+        self._approvals: dict[str, ApprovalRecord] = {}
+
+    @staticmethod
+    def _fingerprint(workflow: WorkflowCoreResponse) -> str:
+        payload = {
+            "workflow_id": workflow.workflow_id,
+            "steps": [step.model_dump(mode="json") for step in workflow.steps],
+            "external_action_executed": workflow.external_action_executed,
+            "approval_required": workflow.approval_required,
+        }
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    def get_status(self) -> ApprovalStatusResponse:
+        return ApprovalStatusResponse(
+            supported_statuses=list(ApprovalStatus),
+            safety_guards=["approval_required", "expiry_check", "single_execution", "workflow_fingerprint", "simulation_only"],
+        )
+
+    def register_workflow(self, workflow: WorkflowCoreResponse) -> WorkflowCoreResponse:
+        with self._lock:
+            workflow.workflow_fingerprint = self._fingerprint(workflow)
+            self._workflows[workflow.workflow_id] = deepcopy(workflow)
+            return workflow
+
+    def _refresh_expiry(self, approval: ApprovalRecord) -> None:
+        if approval.status in {ApprovalStatus.PENDING, ApprovalStatus.APPROVED} and self._now() >= approval.expires_at:
+            approval.status = ApprovalStatus.EXPIRED
+
+    def create_approval(self, workflow_id: str, expires_in_minutes: int = 30, requested_by: str | None = None) -> ApprovalRecord:
+        with self._lock:
+            workflow = self._workflows.get(workflow_id)
+            if workflow is None:
+                raise WorkflowNotFound("Workflow wurde nicht gefunden.")
+            fingerprint = self._fingerprint(workflow)
+            for approval in self._approvals.values():
+                self._refresh_expiry(approval)
+                if approval.workflow_id == workflow_id and approval.workflow_fingerprint == fingerprint and approval.status == ApprovalStatus.PENDING:
+                    return deepcopy(approval)  # Idempotent for an unchanged pending workflow.
+            now = self._now()
+            approval = ApprovalRecord(
+                approval_id=f"apr_{uuid4().hex}", workflow_id=workflow_id, status=ApprovalStatus.PENDING,
+                created_at=now, expires_at=now + timedelta(minutes=expires_in_minutes),
+                requested_by=requested_by, workflow_fingerprint=fingerprint,
+            )
+            self._approvals[approval.approval_id] = approval
+            logger.info("approval_created", extra={"approval_id": approval.approval_id, "workflow_id": workflow_id, "status": approval.status.value})
+            return deepcopy(approval)
+
+    def get_approval(self, approval_id: str) -> ApprovalRecord:
+        with self._lock:
+            approval = self._approvals.get(approval_id)
+            if approval is None:
+                raise ApprovalNotFound("Freigabe wurde nicht gefunden.")
+            self._refresh_expiry(approval)
+            return deepcopy(approval)
+
+    def decide_approval(self, approval_id: str, decision: str, decided_by: str | None = None, reason: str | None = None) -> ApprovalRecord:
+        with self._lock:
+            approval = self._approvals.get(approval_id)
+            if approval is None:
+                raise ApprovalNotFound("Freigabe wurde nicht gefunden.")
+            self._refresh_expiry(approval)
+            if approval.status == ApprovalStatus.EXPIRED:
+                raise ApprovalExpired("Freigabe ist abgelaufen.")
+            if approval.status != ApprovalStatus.PENDING:
+                raise ApprovalConflict("Nur eine ausstehende Freigabe kann entschieden werden.")
+            approval.status = ApprovalStatus(decision)
+            approval.decided_at = self._now()
+            approval.decided_by = decided_by
+            approval.reason = reason
+            logger.info("approval_decided", extra={"approval_id": approval.approval_id, "workflow_id": approval.workflow_id, "status": approval.status.value})
+            return deepcopy(approval)
+
+    def execute_approved_workflow(self, approval_id: str) -> ApprovalExecutionResponse:
+        with self._lock:
+            approval = self._approvals.get(approval_id)
+            if approval is None:
+                raise ApprovalNotFound("Freigabe wurde nicht gefunden.")
+            self._refresh_expiry(approval)
+            if approval.status == ApprovalStatus.EXPIRED:
+                raise ApprovalExpired("Freigabe ist abgelaufen.")
+            if approval.status == ApprovalStatus.EXECUTED:
+                raise ApprovalAlreadyExecuted("Freigabe wurde bereits ausgeführt.")
+            if approval.status != ApprovalStatus.APPROVED:
+                raise ApprovalNotApproved("Workflow ist nicht freigegeben.")
+            workflow = self._workflows.get(approval.workflow_id)
+            if workflow is None:
+                raise WorkflowNotFound("Workflow wurde nicht gefunden.")
+            if workflow.workflow_id != approval.workflow_id or self._fingerprint(workflow) != approval.workflow_fingerprint:
+                raise WorkflowIntegrityError("Workflow-Integritätsprüfung fehlgeschlagen.")
+            approval.status = ApprovalStatus.EXECUTED
+            approval.executed_at = self._now()
+            logger.info("approval_executed", extra={"approval_id": approval.approval_id, "workflow_id": workflow.workflow_id, "status": approval.status.value, "execution_mode": "simulation"})
+            return ApprovalExecutionResponse(
+                approval_id=approval.approval_id, workflow_id=workflow.workflow_id,
+                executed_steps=[step.step for step in workflow.steps],
+                message="Freigegebener Workflow wurde ausschließlich lokal simuliert; keine externe Aktion wurde ausgeführt.",
+            )
 
 
 class BaseAgentService:
@@ -84,10 +210,11 @@ class CalendarAgentService(BaseAgentService):
 class WorkflowCoreService:
     agent_name = "workflow_core"
 
-    def __init__(self, crm: CrmAgentService, email: EmailAgentService, calendar: CalendarAgentService):
+    def __init__(self, crm: CrmAgentService, email: EmailAgentService, calendar: CalendarAgentService, approvals: ApprovalService):
         self.crm = crm
         self.email = email
         self.calendar = calendar
+        self.approvals = approvals
         self.audit = AuditLogger()
 
     def status(self) -> AgentStatus:
@@ -149,4 +276,4 @@ class WorkflowCoreService:
             request_id=response.request_id,
             result=response.status,
         )
-        return response
+        return self.approvals.register_workflow(response)
