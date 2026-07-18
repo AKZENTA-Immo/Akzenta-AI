@@ -1,4 +1,12 @@
-# AKZENTA AI – Version 1.6.0
+# AKZENTA AI – Version 1.9.0
+
+## Version 1.9 – lokale RAG Knowledge Engine
+
+Die Backend-API stellt unter `/knowledge` einen vollständig lokalen RAG-Pfad bereit. Unterstützte Dropbox-Dokumente (`pdf`, `docx`, `pptx`, `ppsx`, `txt`, `xlsx`) werden gelesen, konfigurierbar gechunkt und ausschließlich über das konfigurierte Ollama-Modell eingebettet. Dokumente, Chunks, Metadaten und Embeddings liegen persistent in `data/knowledge.sqlite3`; Cloud-Embedding-Dienste werden nicht verwendet.
+
+Endpunkte: `POST /knowledge/index`, `POST /knowledge/reindex`, `GET /knowledge/statistics`, `POST /knowledge/search`, `POST /knowledge/ask` und `GET /knowledge/document/{id}`. Ohne belastbaren Treffer antwortet `/knowledge/ask` exakt mit `Keine passende Information gefunden.`
+
+Konfiguration: `AKZENTA_RAG_DB`, `AKZENTA_RAG_CHUNK_SIZE`, `AKZENTA_RAG_CHUNK_OVERLAP`, `AKZENTA_RAG_MIN_SCORE`, `AKZENTA_RAG_TOP_K`, `OLLAMA_EMBEDDING_URL` und `OLLAMA_EMBEDDING_MODEL`.
 
 Version 1.6 führt die lokalen Agenten über eine gemeinsame Basisklasse und eine
 zentrale Registry aus. Version 1.5 ergänzte einen getrennten onOffice-Adapter im sicheren Lesemodus.

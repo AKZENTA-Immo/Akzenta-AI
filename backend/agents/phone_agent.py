@@ -1,7 +1,7 @@
 from backend.agents.base_agent import BaseAgent
 class PhoneAgent(BaseAgent):
     name,display_name,description="telefon","Telefon-Agent","Telefonate ausschließlich textuell vorbereiten"
-    capabilities=("gespraechsleitfaden","anruf_vorbereiten","eingehenden_anruf_simulieren","lead_qualifizierung","terminvereinbarung","verkaufergespraech","kapitalanlagegespraech","rueckruf_vorbereiten","einwandbehandlung","gespraech_zusammenfassen")
+    capabilities=("gespraechsleitfaden","anruf_vorbereiten","eingehenden_anruf_simulieren","lead_qualifizierung","terminvereinbarung","verkaufergespraech","kapitalanlagegespraech","rueckruf_vorbereiten","einwandbehandlung","gespraech_zusammenfassen","knowledge_lookup")
     keywords=("anrufen","telefon","rückruf","gesprächsleitfaden","einwand","telefongespräch")
     def detect_action(self,m):
         n=m.casefold()

@@ -3,7 +3,7 @@ from backend.agents.base_agent import AgentRequest, BaseAgent, extract
 
 class CrmAgent(BaseAgent):
     name, display_name, description = "crm", "CRM-Agent", "Leads und Kundendaten sicher vorbereiten"
-    capabilities = ("lead_suchen", "lead_anlegen_vorbereiten", "lead_aktualisieren_vorbereiten", "notiz_vorbereiten", "wiedervorlage_vorbereiten", "lead_qualifizieren", "verkaufer_lead_erfassen", "kapitalanlage_lead_erfassen", "kundendaten_zusammenfassen", "onoffice_kontakt_suchen")
+    capabilities = ("lead_suchen", "lead_anlegen_vorbereiten", "lead_aktualisieren_vorbereiten", "notiz_vorbereiten", "wiedervorlage_vorbereiten", "lead_qualifizieren", "verkaufer_lead_erfassen", "kapitalanlage_lead_erfassen", "kundendaten_zusammenfassen", "onoffice_kontakt_suchen", "knowledge_lookup")
     keywords = ("crm", "lead", "kunde", "interessent", "eigentümer", "verkäufer", "wiedervorlage", "onoffice")
     def detect_action(self, m):
         n=m.casefold()

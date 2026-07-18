@@ -1,7 +1,7 @@
 from backend.agents.base_agent import BaseAgent
 class MarketingAgent(BaseAgent):
     name,display_name,description="marketing","Marketing-Agent","Marketinginhalte ohne Veröffentlichung vorbereiten"
-    capabilities=("social_media_post","newsletter","kampagnenidee","video_script","hook","call_to_action","landingpage_text","zielgruppenanalyse","content_plan","nachfasskampagne","verkauferkampagne","kapitalanlagekampagne","retargeting_text","google_ads_text","testimonial_anfrage")
+    capabilities=("social_media_post","newsletter","kampagnenidee","video_script","hook","call_to_action","landingpage_text","zielgruppenanalyse","content_plan","nachfasskampagne","verkauferkampagne","kapitalanlagekampagne","retargeting_text","google_ads_text","testimonial_anfrage","knowledge_lookup")
     keywords=("marketing","kampagne","newsletter","instagram","facebook","social media","video","hook","landingpage","google ads")
     def detect_action(self,m):
         n=m.casefold()

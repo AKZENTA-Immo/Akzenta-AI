@@ -1,7 +1,7 @@
 from backend.agents.base_agent import AgentRequest, BaseAgent, extract
 class EmailAgent(BaseAgent):
     name, display_name, description="email","E-Mail-Agent","E-Mail-Entwürfe ohne Versand"
-    capabilities=("email_entwurf","email_antwort","terminbestaetigung","unterlagen_anfordern","nachfassmail","verkaufer_ansprache","kapitalanlage_ansprache","absage","dokumentenversand_vorbereiten","besichtigungsbestaetigung","bewertungsanfrage")
+    capabilities=("email_entwurf","email_antwort","terminbestaetigung","unterlagen_anfordern","nachfassmail","verkaufer_ansprache","kapitalanlage_ansprache","absage","dokumentenversand_vorbereiten","besichtigungsbestaetigung","bewertungsanfrage","knowledge_lookup")
     keywords=("e-mail","email","mail","betreff","empfänger","nachfassmail","anschreiben","schreibe herr","schreibe frau")
     def detect_action(self,m):
         n=m.casefold()

@@ -97,3 +97,10 @@ class BaseAgent(ABC):
 
     def health_check(self) -> dict[str, Any]:
         return {"name": self.name, "display_name": self.display_name, "available": True, "simulation": True, "capabilities": list(self.capabilities)}
+
+    def knowledge_lookup(self, query: str, top_k: int = 5) -> dict[str, Any]:
+        """Expliziter, lokaler Lesezugriff für dafür freigeschaltete Agenten."""
+        if "knowledge_lookup" not in self.capabilities:
+            raise PermissionError("Agent darf die Wissensbasis nicht verwenden.")
+        from backend.rag.knowledge_service import KnowledgeService
+        return KnowledgeService().search(query, top_k)

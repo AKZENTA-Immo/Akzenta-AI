@@ -171,3 +171,11 @@ Neue Endpunkte:
 Beispielablauf: Workflow über `/agents/workflows/start` mit `definition_id=lead_qualification` starten, über `/run` bis zum Approval-Gate ausführen, die verknüpfte Freigabe über `/agents/approvals/{approval_id}` abrufen und über `/decision` freigeben. Anschließend `/resume` aufrufen, den Abschluss über `/agents/workflows/{workflow_id}` prüfen und die Historie über `/agents/workflows/{workflow_id}/audit` abrufen.
 
 Version 1.8 führt keine echten externen Aktionen aus: keine E-Mail, kein Kalendertermin, keine CRM-Schreiboperation, kein WhatsApp und keine Telefonie. Alle Schritt- und Workflow-Ausgaben garantieren `safe=true`, `execution_mode=simulation` und `external_actions_performed=false`.
+
+## Version 1.9 – lokale RAG Knowledge Engine
+
+`backend/rag` indexiert die vorhandene Dropbox-Wissensbasis lokal. Loader, Chunker, Ollama-Embedding-Adapter, SQLite-Vektorspeicher, Retriever und `KnowledgeService` sind getrennt testbar. Das additive SQLite-Schema umfasst `documents`, `chunks` und `embeddings`; Quellmetadaten enthalten Dateiname, relativen Pfad, Seite beziehungsweise Folie, Abschnitt, Ordner, Dokumenttyp und Änderungsdatum. Quelldateien werden nie verändert.
+
+Die semantische Suche liefert Top-K-Treffer mit Cosine-Score und echten Quellen. `/knowledge/ask` übergibt ausschließlich gefundene Chunks an das lokale Ollama-Chatmodell. Ohne ausreichend relevanten Kontext lautet die Antwort exakt `Keine passende Information gefunden.` Quellen erscheinen nur, wenn die Modellantwort sie tatsächlich referenziert.
+
+Der Workflow-Orchestrator kennt die allowlist-geschützte Aktion `knowledge_lookup`. Sie wird nur bei vorhandenem `knowledge_query` ausgeführt und verändert keine externen Systeme. CRM-, E-Mail-, Telefon- und Marketing-Agent deklarieren denselben lokalen Lesezugriff als Capability.

@@ -39,7 +39,8 @@ WORKFLOW_DEFINITIONS = {
     "lead_qualification": WorkflowDefinition(definition_id="lead_qualification", name="Lead-Qualifizierung",
         description="Sichere mehrstufige Qualifizierung mit Freigabe-Gate.", version="1.8", steps=[
             _step("validate_lead", "workflow", "validate_lead", retries=2),
-            _step("crm_lookup", "crm", "simulated_read", "validate_lead"),
+            _step("knowledge_lookup", "knowledge", "knowledge_lookup", "validate_lead", {"type":"input_present","key":"knowledge_query"}),
+            _step("crm_lookup", "crm", "simulated_read", "knowledge_lookup"),
             _step("document_check", "documents", "simulated_check", "crm_lookup", {"type":"input_present","key":"object_address"}),
             _step("email_draft", "email", "draft", "document_check"),
             _step("calendar_preview", "calendar", "preview", "email_draft", {"type":"input_equals","key":"appointment_requested","value":True}),
@@ -50,7 +51,8 @@ WORKFLOW_DEFINITIONS = {
     "seller_follow_up": WorkflowDefinition(definition_id="seller_follow_up", name="Verkäufer-Follow-up",
         description="Sichere simulierte Verkäufer-Nachverfolgung.", version="1.8", steps=[
             _step("validate_request", "workflow", "validate_request", retries=2),
-            _step("crm_lookup", "crm", "simulated_read", "validate_request"),
+            _step("knowledge_lookup", "knowledge", "knowledge_lookup", "validate_request", {"type":"input_present","key":"knowledge_query"}),
+            _step("crm_lookup", "crm", "simulated_read", "knowledge_lookup"),
             _step("market_context_preview", "marketing", "market_preview", "crm_lookup"),
             _step("email_draft", "email", "draft", "market_context_preview"),
             _step("approval_gate", "approval", "request", "email_draft", approval=True),
@@ -63,8 +65,9 @@ WORKFLOW_DEFINITIONS = {
 class WorkflowOrchestrator:
     ACTION_ALLOWLIST = {step.action for definition in WORKFLOW_DEFINITIONS.values() for step in definition.steps}
 
-    def __init__(self, repository: WorkflowRepository, approvals):
+    def __init__(self, repository: WorkflowRepository, approvals, knowledge_service=None):
         self.repository, self.approvals = repository, approvals
+        self.knowledge_service = knowledge_service
         for definition in WORKFLOW_DEFINITIONS.values(): self.repository.save_workflow_definition(definition)
 
     def get_status(self):
@@ -126,6 +129,11 @@ class WorkflowOrchestrator:
         result = {"agent":step["agent"], "action":step["action"], "status":"simulated", "simulation":True,
             "safe":True, "external_actions_performed":False, "result":{"prepared":True}, "warnings":[], "missing_information":[]}
         if step["action"] == "draft" and not data.get("email"): result["warnings"].append("Keine E-Mail-Adresse; Entwurf bleibt unadressiert.")
+        if step["action"] == "knowledge_lookup":
+            if self.knowledge_service is None:
+                from backend.rag.knowledge_service import KnowledgeService
+                self.knowledge_service = KnowledgeService()
+            result["result"] = self.knowledge_service.search(data["knowledge_query"], data.get("knowledge_top_k", 5))
         return result
 
     def run_next_step(self, workflow_id):
