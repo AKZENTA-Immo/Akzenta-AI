@@ -36,6 +36,15 @@ def _step(step_id, agent, action, previous=None, condition=None, approval=False,
 
 
 WORKFLOW_DEFINITIONS = {
+    "phone_conversation": WorkflowDefinition(definition_id="phone_conversation", name="Telefonat",
+        description="Lokale Verarbeitung eines Telefonats mit Nachbereitung.", version="1.9", steps=[
+            _step("phone_call", "phone", "phone_call"),
+            _step("knowledge_lookup", "knowledge", "knowledge_lookup", "phone_call", {"type":"input_present","key":"knowledge_query"}),
+            _step("appointment_booking", "calendar", "appointment_booking", "knowledge_lookup", {"type":"input_equals","key":"appointment_requested","value":True}),
+            _step("crm_update", "crm", "crm_update", "appointment_booking"),
+            _step("email_followup", "email", "email_followup", "crm_update", {"type":"input_equals","key":"email_followup","value":True}),
+            _step("handover", "phone", "handover", "email_followup", {"type":"input_equals","key":"handover","value":True}),
+        ]),
     "lead_qualification": WorkflowDefinition(definition_id="lead_qualification", name="Lead-Qualifizierung",
         description="Sichere mehrstufige Qualifizierung mit Freigabe-Gate.", version="1.8", steps=[
             _step("validate_lead", "workflow", "validate_lead", retries=2),

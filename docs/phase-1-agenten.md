@@ -179,3 +179,10 @@ Version 1.8 führt keine echten externen Aktionen aus: keine E-Mail, kein Kalend
 Die semantische Suche liefert Top-K-Treffer mit Cosine-Score und echten Quellen. `/knowledge/ask` übergibt ausschließlich gefundene Chunks an das lokale Ollama-Chatmodell. Ohne ausreichend relevanten Kontext lautet die Antwort exakt `Keine passende Information gefunden.` Quellen erscheinen nur, wenn die Modellantwort sie tatsächlich referenziert.
 
 Der Workflow-Orchestrator kennt die allowlist-geschützte Aktion `knowledge_lookup`. Sie wird nur bei vorhandenem `knowledge_query` ausgeführt und verändert keine externen Systeme. CRM-, E-Mail-, Telefon- und Marketing-Agent deklarieren denselben lokalen Lesezugriff als Capability.
+# Phone Agent – lokale Gesprächssteuerung
+
+Der `CallManager` koordiniert Gesprächszustand, Dialog, Termin, Eskalation und Nachbereitung. `ConversationMemory` hält Name, Telefon, Objekt, Interesse, Budget, Termin und Notizen über mehrere Nachrichten und persistiert sie in den Tabellen `calls`, `call_messages`, `call_summary` und `phone_sessions`. Termine liegen vorläufig providerneutral in der lokalen Tabelle `appointments`.
+
+Die Intent-Erkennung umfasst Begrüßung, Rückruf, Verkäufer, Kapitalanlage, Besichtigung, Termin, Dokumente, Preis, Objektfrage, Finanzierung, Ablehnung, Verabschiedung und Unbekannt. Beschwerden, Konflikte, rechtliche Fragen, technische Probleme, Unsicherheit oder der ausdrückliche Wunsch nach einem Mitarbeiter lösen eine Übergabe aus.
+
+Jeder Anruf startet die Workflow-Definition `phone_conversation`. Sie registriert die Actions `phone_call`, `appointment_booking`, `email_followup`, `crm_update`, `knowledge_lookup` und `handover`. CRM-Schreibzugriffe bleiben Vorschauen, Follow-up-Mails bleiben Entwürfe und Termine bleiben lokale Reservierungen. Alle Komponenten sind über Konstruktor-Injektion austauschbar.

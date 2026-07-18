@@ -37,7 +37,7 @@ def test_engine_status_and_registered_definitions_are_safe():
     status = client.get("/agents/workflow-engine/status").json()
     assert status["safe"] and status["simulation_only"] and not status["external_actions_allowed"]
     assert status["retry_enabled"] and status["resume_enabled"]
-    assert {d["definition_id"] for d in client.get("/agents/workflow-definitions").json()} == {"lead_qualification","seller_follow_up"}
+    assert {d["definition_id"] for d in client.get("/agents/workflow-definitions").json()} == {"lead_qualification","seller_follow_up","phone_conversation"}
     assert client.get("/agents/workflow-definitions/missing").status_code == 404
 
 

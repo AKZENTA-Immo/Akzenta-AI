@@ -405,3 +405,10 @@ npm audit
   Office-Vorschau sowie OCR folgen in späteren Versionen.
 - Chatverläufe werden nicht dauerhaft im Browser gespeichert. Ein Neuladen der
   Seite verwirft die aktuell angezeigte Antwort.
+# Lokaler AI Phone Agent (Version 1.9)
+
+Der neue Phone Agent unter `backend/phone/` verarbeitet mehrstufige Telefongespräche vollständig lokal. Die REST-API stellt `POST /phone/start`, `POST /phone/message`, `POST /phone/end`, `GET /phone/session/{id}` und `GET /phone/statistics` bereit. Sitzungen, Nachrichten, Zusammenfassungen und Termine werden in SQLite gespeichert. Nach Gesprächsende entstehen eine CRM-Änderungsvorschau, optional ein nicht versendeter E-Mail-Entwurf und eine Zusammenfassung mit Lead Score, offenen Punkten und nächsten Schritten.
+
+Faktenantworten kommen ausschließlich aus dem lokalen `KnowledgeService`. Fehlt ein belegter Treffer, antwortet der Agent: „Darauf habe ich aktuell keine gesicherte Information.“ Ollama bleibt der lokale Chat-/Embedding-Provider; Cloud-Dienste werden nicht verwendet.
+
+STT und TTS sind über `STTAdapter` und `TTSAdapter` entkoppelt. `/phone/message` akzeptiert Text oder Base64-Audio und kann optional Base64-Audio zurückgeben. Offline-Engines wie whisper.cpp, faster-whisper, Vosk, Piper oder Coqui können implementiert und injiziert werden. Ohne konfigurierten Adapter wird keine Engine erzwungen. Relevante Umgebungsvariablen sind `AKZENTA_PHONE_DB`, `AKZENTA_PHONE_STT_ENGINE`, `AKZENTA_PHONE_TTS_ENGINE`, `AKZENTA_PHONE_LANGUAGE` und `AKZENTA_PHONE_KNOWLEDGE_TOP_K`.

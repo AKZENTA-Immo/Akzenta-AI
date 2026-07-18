@@ -33,6 +33,11 @@ RAG_CHUNK_SIZE = int(os.getenv("AKZENTA_RAG_CHUNK_SIZE", str(ABSCHNITT_ZEICHEN))
 RAG_CHUNK_OVERLAP = int(os.getenv("AKZENTA_RAG_CHUNK_OVERLAP", str(ABSCHNITT_UEBERLAPPUNG)))
 RAG_MIN_SCORE = float(os.getenv("AKZENTA_RAG_MIN_SCORE", "0.25"))
 RAG_TOP_K = int(os.getenv("AKZENTA_RAG_TOP_K", "5"))
+PHONE_DB_PATH = Path(os.getenv("AKZENTA_PHONE_DB", str(PROJECT_PATH / "data" / "phone_agent.sqlite3")))
+PHONE_STT_ENGINE = os.getenv("AKZENTA_PHONE_STT_ENGINE", "none")
+PHONE_TTS_ENGINE = os.getenv("AKZENTA_PHONE_TTS_ENGINE", "none")
+PHONE_DEFAULT_LANGUAGE = os.getenv("AKZENTA_PHONE_LANGUAGE", "de")
+PHONE_KNOWLEDGE_TOP_K = int(os.getenv("AKZENTA_PHONE_KNOWLEDGE_TOP_K", "5"))
 AGENT_MOCK_MODE = os.getenv("AKZENTA_AGENT_MOCK_MODE", "true").lower() == "true"
 AGENT_AUDIT_LOG = Path(os.getenv("AKZENTA_AGENT_AUDIT_LOG", str(PROJECT_PATH / "data" / "agent-audit.jsonl")))
 ONOFFICE_ENABLED = os.getenv("ONOFFICE_ENABLED", "false").lower() == "true"
