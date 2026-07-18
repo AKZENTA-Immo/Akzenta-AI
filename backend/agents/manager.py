@@ -1,6 +1,7 @@
 from backend.adapters import MockCalendarAdapter, MockGmailAdapter, MockOnOfficeAdapter, MockPhoneAdapter, MockWhatsAppAdapter
 from backend.agents.services import ApprovalService, CalendarAgentService, CrmAgentService, EmailAgentService, WorkflowCoreService
 from backend.agents.workflow_repository import WorkflowRepository
+from backend.agents.workflow_engine import WorkflowOrchestrator
 
 
 class AgentManager:
@@ -11,6 +12,7 @@ class AgentManager:
         self.repository = repository or WorkflowRepository()
         self.approvals = ApprovalService(self.repository)
         self.workflow_core = WorkflowCoreService(self.crm, self.email, self.calendar, self.approvals)
+        self.workflow_engine = WorkflowOrchestrator(self.repository, self.approvals)
         self.future_adapters = {"whatsapp": MockWhatsAppAdapter(), "phone": MockPhoneAdapter()}
 
     def statuses(self):
@@ -21,6 +23,8 @@ class AgentManager:
             "safe": True, "external_actions": False, "approval_required": True,
             "execution_mode": "simulation", "persistence": "sqlite", "persistent": True,
             "restart_safe": True, "audit_log": True,
+            "workflow_engine": True, "multi_step_workflows": True, "resume_enabled": True,
+            "retry_enabled": True, "conditions_enabled": True, "dynamic_code_execution": False,
         }
 
 

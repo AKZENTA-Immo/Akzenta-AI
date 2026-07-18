@@ -27,7 +27,7 @@ class ConcurrentUpdateError(PersistenceError):
     pass
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def utc_now() -> datetime:
@@ -106,6 +106,32 @@ class WorkflowRepository:
                     CREATE INDEX IF NOT EXISTS idx_audit_workflow ON audit_events(workflow_id, created_at, event_id);
                 """)
                 connection.execute("INSERT INTO schema_version(version, applied_at) VALUES (?, ?)", (1, utc_now().isoformat()))
+            if current < 2:
+                connection.executescript("""
+                    CREATE TABLE IF NOT EXISTS workflow_definitions (
+                        definition_id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL,
+                        version TEXT NOT NULL, enabled INTEGER NOT NULL CHECK(enabled IN (0,1)),
+                        definition_payload TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+                    );
+                    CREATE TABLE IF NOT EXISTS workflow_instances (
+                        workflow_id TEXT PRIMARY KEY REFERENCES workflows(workflow_id), definition_id TEXT NOT NULL REFERENCES workflow_definitions(definition_id),
+                        name TEXT NOT NULL, status TEXT NOT NULL, current_step_id TEXT, created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL, completed_at TEXT, requested_by TEXT, input_payload TEXT NOT NULL,
+                        output_payload TEXT NOT NULL, approval_id TEXT, execution_mode TEXT NOT NULL CHECK(execution_mode='simulation'),
+                        external_actions_performed INTEGER NOT NULL CHECK(external_actions_performed=0), metadata_payload TEXT NOT NULL
+                    );
+                    CREATE TABLE IF NOT EXISTS workflow_steps (
+                        workflow_id TEXT NOT NULL REFERENCES workflow_instances(workflow_id), step_id TEXT NOT NULL,
+                        position INTEGER NOT NULL, name TEXT NOT NULL, agent TEXT NOT NULL, action TEXT NOT NULL,
+                        status TEXT NOT NULL, attempt INTEGER NOT NULL, max_retries INTEGER NOT NULL,
+                        depends_on TEXT NOT NULL, condition_payload TEXT NOT NULL, input_payload TEXT NOT NULL,
+                        output_payload TEXT NOT NULL, error TEXT, started_at TEXT, completed_at TEXT, updated_at TEXT NOT NULL,
+                        PRIMARY KEY(workflow_id, step_id)
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_instances_created ON workflow_instances(created_at DESC);
+                    CREATE INDEX IF NOT EXISTS idx_steps_workflow ON workflow_steps(workflow_id, position);
+                """)
+                connection.execute("INSERT OR IGNORE INTO schema_version(version, applied_at) VALUES (?, ?)", (2, utc_now().isoformat()))
 
     @staticmethod
     def _audit(connection: sqlite3.Connection, *, entity_type: str, entity_id: str, event_type: str,
@@ -280,6 +306,112 @@ class WorkflowRepository:
     def add_audit_event(self, **event: Any) -> None:
         with self._transaction(immediate=True) as connection:
             self._audit(connection, **event)
+
+    def save_workflow_definition(self, definition: Any) -> None:
+        payload = definition.model_dump(mode="json") if hasattr(definition, "model_dump") else definition
+        now = utc_now().isoformat()
+        with self._transaction(immediate=True) as connection:
+            connection.execute("""INSERT INTO workflow_definitions VALUES(?,?,?,?,?,?,?,?)
+                ON CONFLICT(definition_id) DO UPDATE SET name=excluded.name,description=excluded.description,
+                version=excluded.version,enabled=excluded.enabled,definition_payload=excluded.definition_payload,updated_at=excluded.updated_at""",
+                (payload["definition_id"], payload["name"], payload.get("description", ""), payload.get("version", "1.0"),
+                 int(payload.get("enabled", True)), canonical_json(payload), now, now))
+
+    def get_workflow_definition(self, definition_id: str) -> dict[str, Any] | None:
+        with self._connect() as connection:
+            row = connection.execute("SELECT definition_payload FROM workflow_definitions WHERE definition_id=?", (definition_id,)).fetchone()
+        return json.loads(row[0]) if row else None
+
+    def list_workflow_definitions(self) -> list[dict[str, Any]]:
+        with self._connect() as connection:
+            rows = connection.execute("SELECT definition_payload FROM workflow_definitions ORDER BY definition_id").fetchall()
+        return [json.loads(row[0]) for row in rows]
+
+    def create_workflow_instance(self, instance: dict[str, Any], steps: list[dict[str, Any]], fingerprint: str) -> None:
+        now = instance["created_at"]
+        public = {"workflow_id": instance["workflow_id"], "status": instance["status"], "steps": []}
+        with self._transaction(immediate=True) as connection:
+            connection.execute("INSERT INTO workflows VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                (instance["workflow_id"], now, now, instance["status"], fingerprint, canonical_json(instance["input"]),
+                 canonical_json(public), 1, 0, "simulation", None))
+            connection.execute("INSERT INTO workflow_instances VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (instance["workflow_id"], instance["definition_id"], instance["name"], instance["status"], None, now, now,
+                 None, instance.get("requested_by"), canonical_json(instance["input"]), "{}", None, "simulation", 0,
+                 canonical_json(instance.get("metadata", {}))))
+            for step in steps:
+                connection.execute("INSERT INTO workflow_steps VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (instance["workflow_id"], step["step_id"], step["position"], step["name"], step["agent"], step["action"],
+                     "pending", 0, step["max_retries"], canonical_json(step["depends_on"]), canonical_json(step["condition"]),
+                     "{}", "{}", None, None, None, now))
+            self._audit(connection, entity_type="workflow", entity_id=instance["workflow_id"], workflow_id=instance["workflow_id"],
+                        event_type="workflow_instance_created", new_status="created")
+
+    @staticmethod
+    def _instance(row: sqlite3.Row) -> dict[str, Any]:
+        value = dict(row)
+        for key in ("input_payload", "output_payload", "metadata_payload"):
+            value[key.removesuffix("_payload")] = json.loads(value.pop(key))
+        value["external_actions_performed"] = bool(value["external_actions_performed"])
+        return value
+
+    def get_workflow_instance(self, workflow_id: str) -> dict[str, Any] | None:
+        with self._connect() as connection:
+            row = connection.execute("SELECT * FROM workflow_instances WHERE workflow_id=?", (workflow_id,)).fetchone()
+        return self._instance(row) if row else None
+
+    def list_workflow_instances(self, limit: int = 50, status: str | None = None) -> list[dict[str, Any]]:
+        sql = "SELECT * FROM workflow_instances"; params: list[Any] = []
+        if status: sql += " WHERE status=?"; params.append(status)
+        sql += " ORDER BY created_at DESC LIMIT ?"; params.append(limit)
+        with self._connect() as connection: rows = connection.execute(sql, params).fetchall()
+        return [self._instance(row) for row in rows]
+
+    @staticmethod
+    def _engine_step(row: sqlite3.Row) -> dict[str, Any]:
+        value = dict(row)
+        for key in ("depends_on", "condition_payload", "input_payload", "output_payload"):
+            target = {"condition_payload":"condition", "input_payload":"input", "output_payload":"output"}.get(key, key)
+            value[target] = json.loads(value.pop(key))
+        return value
+
+    def get_workflow_steps(self, workflow_id: str) -> list[dict[str, Any]]:
+        with self._connect() as connection: rows = connection.execute("SELECT * FROM workflow_steps WHERE workflow_id=? ORDER BY position", (workflow_id,)).fetchall()
+        return [self._engine_step(row) for row in rows]
+
+    def get_workflow_step(self, workflow_id: str, step_id: str) -> dict[str, Any] | None:
+        with self._connect() as connection: row = connection.execute("SELECT * FROM workflow_steps WHERE workflow_id=? AND step_id=?", (workflow_id, step_id)).fetchone()
+        return self._engine_step(row) if row else None
+
+    def update_engine_workflow(self, workflow_id: str, status: str, current_step_id: str | None = None, approval_id: str | None = None, completed: bool = False) -> None:
+        now = utc_now().isoformat()
+        with self._transaction(immediate=True) as connection:
+            result = connection.execute("UPDATE workflow_instances SET status=?,current_step_id=?,approval_id=COALESCE(?,approval_id),updated_at=?,completed_at=CASE WHEN ? THEN ? ELSE completed_at END WHERE workflow_id=?",
+                (status, current_step_id, approval_id, now, int(completed), now, workflow_id))
+            if result.rowcount != 1: raise ConcurrentUpdateError("Workflowstatus konnte nicht aktualisiert werden.")
+            connection.execute("UPDATE workflows SET status=?,updated_at=? WHERE workflow_id=?", (status, now, workflow_id))
+
+    def update_step_status(self, workflow_id: str, step_id: str, status: str, *, error: str | None = None, output: dict[str, Any] | None = None, expected: tuple[str, ...] | None = None, increment_attempt: bool = False) -> None:
+        now = utc_now().isoformat(); expected = expected or ("pending", "running", "waiting", "failed", "blocked")
+        placeholders = ",".join("?" for _ in expected)
+        sql = f"""UPDATE workflow_steps SET status=?,error=?,output_payload=COALESCE(?,output_payload),updated_at=?,
+            started_at=CASE WHEN ?='running' THEN ? ELSE started_at END,
+            completed_at=CASE WHEN ? IN ('completed','failed','skipped') THEN ? ELSE completed_at END,
+            attempt=attempt+? WHERE workflow_id=? AND step_id=? AND status IN ({placeholders})"""
+        with self._transaction(immediate=True) as connection:
+            result = connection.execute(sql, (status, error, canonical_json(output) if output is not None else None, now, status, now, status, now,
+                int(increment_attempt), workflow_id, step_id, *expected))
+            if result.rowcount != 1: raise ConcurrentUpdateError("Schritt wurde bereits oder in einem anderen Zustand verarbeitet.")
+
+    def increment_step_attempt(self, workflow_id: str, step_id: str) -> None:
+        with self._transaction(immediate=True) as connection:
+            connection.execute("UPDATE workflow_steps SET attempt=attempt+1,updated_at=? WHERE workflow_id=? AND step_id=?", (utc_now().isoformat(), workflow_id, step_id))
+
+    def set_workflow_approval(self, workflow_id: str, approval_id: str) -> None:
+        self.update_engine_workflow(workflow_id, "waiting_for_approval", approval_id=approval_id)
+
+    def mark_workflow_completed(self, workflow_id: str) -> None: self.update_engine_workflow(workflow_id, "completed", completed=True)
+    def cancel_workflow(self, workflow_id: str) -> None: self.update_engine_workflow(workflow_id, "cancelled")
+    def append_audit_event(self, **event: Any) -> None: self.add_audit_event(**event)
 
     @staticmethod
     def _event(row: sqlite3.Row) -> AuditEvent:

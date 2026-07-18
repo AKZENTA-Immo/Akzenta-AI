@@ -146,3 +146,28 @@ npm.cmd run build
 ```
 
 Das explizite Testverzeichnis verhindert, dass lokale, nicht lesbare Hilfsordner wie `pytest-temp` von Pytest eingesammelt werden. Die defekte lokale `backend/.venv` muss separat mit einer verfügbaren Python-3.11+-Installation neu erstellt werden.
+## Version 1.8 – mehrstufiger Workflow-Orchestrator
+
+Version 1.8 erweitert den persistenten Workflow-Core um einen zustandsbehafteten `WorkflowOrchestrator`. Definitionen und Aktionen sind intern registriert; Requests können weder Python-Code noch Funktionsnamen, Imports, Shell-Befehle oder Bedingungen zur freien Ausführung liefern. `eval` wird nicht verwendet.
+
+Die Definition `lead_qualification` umfasst `validate_lead`, `crm_lookup`, `document_check`, `email_draft`, `calendar_preview`, `approval_gate`, `simulated_execution` und `finalize`. `seller_follow_up` umfasst `validate_request`, `crm_lookup`, `market_context_preview`, `email_draft`, `approval_gate`, `simulated_execution` und `finalize`.
+
+Workflow-Zustände sind `created`, `running`, `waiting_for_approval`, `paused`, `completed`, `failed` und `cancelled`. Schritte verwenden `pending`, `running`, `completed`, `failed`, `skipped`, `waiting` und `blocked`. Abgeschlossene Schritte werden bei Resume nicht erneut ausgeführt; abgebrochene Workflows bleiben endgültig gesperrt. Fehlgeschlagene Schritte können ausschließlich kontrolliert und innerhalb von `max_retries` erneut versucht werden.
+
+Sichere Bedingungen unterstützen nur `always`, `input_present`, `input_equals`, `previous_step_succeeded` und `previous_step_output_present`. So wird etwa `calendar_preview` ohne Terminwunsch deterministisch als `skipped` markiert. Abhängigkeiten, unbekannte Schritte, doppelte IDs und Zyklen werden validiert.
+
+Das Approval-Gate nutzt unverändert den vorhandenen `ApprovalService`. Es speichert Approval-ID und Workflow-Fingerprint persistent, setzt Schritt und Workflow wartend und blockiert alle Folgeschritte. Nur `approved` oder `executed` erlaubt Resume; `pending`, `rejected`, `expired` und Fingerprint-Manipulation blockieren. Eine Freigabe erlaubt ausschließlich die Fortsetzung der Simulation.
+
+SQLite-Schema 2 ergänzt additiv `workflow_definitions`, `workflow_instances` und `workflow_steps`; Daten aus Schema 1 bleiben erhalten. Foreign Keys, WAL, Transaktionen und bedingte Statusupdates bleiben aktiv. SQLite ist weiterhin für eine lokale Einzelinstanz ausgelegt. Audit-Ereignisse umfassen Erzeugung, Start, Schrittstart/-abschluss/-fehler/-skip, Approval-Wartezustand, Resume, Retry, Abbruch, Blockierung und Abschluss.
+
+Neue Endpunkte:
+
+- `GET /agents/workflow-engine/status`
+- `GET /agents/workflow-definitions` und `GET /agents/workflow-definitions/{definition_id}`
+- `POST /agents/workflows/start`
+- `POST /agents/workflows/{workflow_id}/run`, `/resume`, `/retry` und `/cancel`
+- `GET /agents/workflows/{workflow_id}/steps`
+
+Beispielablauf: Workflow über `/agents/workflows/start` mit `definition_id=lead_qualification` starten, über `/run` bis zum Approval-Gate ausführen, die verknüpfte Freigabe über `/agents/approvals/{approval_id}` abrufen und über `/decision` freigeben. Anschließend `/resume` aufrufen, den Abschluss über `/agents/workflows/{workflow_id}` prüfen und die Historie über `/agents/workflows/{workflow_id}/audit` abrufen.
+
+Version 1.8 führt keine echten externen Aktionen aus: keine E-Mail, kein Kalendertermin, keine CRM-Schreiboperation, kein WhatsApp und keine Telefonie. Alle Schritt- und Workflow-Ausgaben garantieren `safe=true`, `execution_mode=simulation` und `external_actions_performed=false`.

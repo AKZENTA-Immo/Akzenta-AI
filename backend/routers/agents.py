@@ -7,6 +7,11 @@ from backend.agents.services import (
     ApprovalNotFound, WorkflowIntegrityError, WorkflowNotFound,
 )
 from backend.agents.workflow_repository import PersistenceError, UnsupportedSchemaVersion
+from backend.agents.workflow_engine import (
+    WorkflowAlreadyCompleted, WorkflowApprovalExpired, WorkflowApprovalRejected, WorkflowApprovalRequired,
+    WorkflowCancelled, WorkflowDefinitionNotFound, WorkflowInstanceNotFound, WorkflowInvalidState,
+    WorkflowRetryLimitReached, WorkflowStepInvalidState, WorkflowStepNotFound,
+)
 from backend.agents.base_agent import AgentRequest, AgentResponse
 from backend.agents.registry import agent_registry
 from backend.agents.suite import register_default_agents
@@ -14,6 +19,8 @@ from backend.models.agent_models import (
     ApprovalCreateRequest, ApprovalDecisionRequest, ApprovalExecutionResponse, ApprovalRecord,
     ApprovalStatusResponse, CalendarSimulationRequest, CrmPreviewRequest, EmailDraftRequest,
     WorkflowCoreRequest, WorkflowCoreResponse,
+    WorkflowCancelRequest, WorkflowDefinition, WorkflowEngineStatusResponse, WorkflowInstanceResponse,
+    WorkflowResumeRequest, WorkflowRetryRequest, WorkflowStartRequest,
 )
 
 router = APIRouter(prefix="/agents", tags=["Agenten"])
@@ -27,6 +34,14 @@ def _run(call):
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except (WorkflowNotFound, ApprovalNotFound) as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (WorkflowDefinitionNotFound, WorkflowInstanceNotFound, WorkflowStepNotFound) as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except WorkflowApprovalExpired as exc:
+        raise HTTPException(status_code=410, detail=str(exc)) from exc
+    except (WorkflowApprovalRequired, WorkflowApprovalRejected) as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except (WorkflowAlreadyCompleted, WorkflowCancelled, WorkflowInvalidState, WorkflowRetryLimitReached, WorkflowStepInvalidState) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ApprovalExpired as exc:
         raise HTTPException(status_code=410, detail=str(exc)) from exc
     except ApprovalNotApproved as exc:
@@ -97,13 +112,49 @@ def workflow_core_status(): return agent_manager.workflow_core.status()
 @router.post("/workflows/core/run", response_model=WorkflowCoreResponse)
 def workflow_core_run(request: WorkflowCoreRequest): return _run(lambda: agent_manager.workflow_core.run(request))
 
+@router.get("/workflow-engine/status", response_model=WorkflowEngineStatusResponse)
+def workflow_engine_status(): return agent_manager.workflow_engine.get_status()
+
+@router.get("/workflow-definitions", response_model=list[WorkflowDefinition])
+def workflow_definitions(): return _run(agent_manager.workflow_engine.list_definitions)
+
+@router.get("/workflow-definitions/{definition_id}", response_model=WorkflowDefinition)
+def workflow_definition(definition_id: str): return _run(lambda: agent_manager.workflow_engine.get_definition(definition_id))
+
+@router.post("/workflows/start", response_model=WorkflowInstanceResponse)
+def start_workflow(request: WorkflowStartRequest): return _run(lambda: agent_manager.workflow_engine.start_workflow(request))
+
+@router.post("/workflows/{workflow_id}/run", response_model=WorkflowInstanceResponse)
+def run_workflow(workflow_id: str): return _run(lambda: agent_manager.workflow_engine.run_until_blocked(workflow_id))
+
+@router.post("/workflows/{workflow_id}/resume", response_model=WorkflowInstanceResponse)
+def resume_workflow(workflow_id: str, request: WorkflowResumeRequest): return _run(lambda: agent_manager.workflow_engine.resume_workflow(workflow_id, request.actor, request.reason))
+
+@router.post("/workflows/{workflow_id}/retry", response_model=WorkflowInstanceResponse)
+def retry_workflow(workflow_id: str, request: WorkflowRetryRequest): return _run(lambda: agent_manager.workflow_engine.retry_step(workflow_id, request.step_id, request.actor, request.reason))
+
+@router.post("/workflows/{workflow_id}/cancel", response_model=WorkflowInstanceResponse)
+def cancel_workflow(workflow_id: str, request: WorkflowCancelRequest): return _run(lambda: agent_manager.workflow_engine.cancel_workflow(workflow_id, request.actor, request.reason))
+
+@router.get("/workflows/{workflow_id}/steps")
+def workflow_steps(workflow_id: str):
+    return _run(lambda: agent_manager.workflow_engine.get_workflow(workflow_id).steps)
+
 @router.get("/workflows", response_model=list[dict])
-def list_workflows(status: str | None = Query(default=None, pattern="^(completed|executed)$"), limit: int = Query(default=50, ge=1, le=100)):
-    return _run(lambda: [workflow.public_response() for workflow in agent_manager.repository.list_workflows(limit, status)])
+def list_workflows(status: str | None = Query(default=None, pattern="^(created|running|waiting_for_approval|paused|completed|failed|cancelled|executed)$"), limit: int = Query(default=50, ge=1, le=100)):
+    def load():
+        engine = [item.model_dump(mode="json") for item in agent_manager.workflow_engine.list_workflows(limit, status)]
+        legacy = [workflow.public_response() for workflow in agent_manager.repository.list_workflows(limit, status)
+                  if agent_manager.repository.get_workflow_instance(workflow.workflow_id) is None]
+        return sorted(engine + legacy, key=lambda item: str(item.get("created_at", "")), reverse=True)[:limit]
+    return _run(load)
 
 @router.get("/workflows/{workflow_id}", response_model=dict)
 def get_workflow(workflow_id: str):
     def load():
+        instance = agent_manager.repository.get_workflow_instance(workflow_id)
+        if instance:
+            return agent_manager.workflow_engine.get_workflow(workflow_id).model_dump(mode="json")
         workflow = agent_manager.repository.get_workflow(workflow_id)
         if workflow is None:
             raise WorkflowNotFound("Workflow wurde nicht gefunden.")

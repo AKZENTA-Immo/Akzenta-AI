@@ -15,6 +15,7 @@ from backend.agents.manager import agent_manager
 from backend.agents.services import ApprovalService
 from backend.agents.workflow_repository import WorkflowRepository
 from backend.agents.workflow_repository import UnsupportedSchemaVersion
+from backend.agents.workflow_engine import WorkflowOrchestrator
 
 
 client = TestClient(app)
@@ -27,6 +28,7 @@ def isolated_audit(tmp_path, monkeypatch):
     agent_manager.repository = repository
     agent_manager.approvals = ApprovalService(repository)
     agent_manager.workflow_core.approvals = agent_manager.approvals
+    agent_manager.workflow_engine = WorkflowOrchestrator(repository, agent_manager.approvals)
 
 
 def prepare_workflow(lead_id="LEAD-APPROVAL"):
@@ -255,7 +257,7 @@ def test_schema_is_complete_and_idempotent():
         tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         versions = connection.execute("SELECT version FROM schema_version").fetchall()
     assert {"workflows", "approvals", "audit_events", "schema_version"} <= tables
-    assert versions == [(1,)]
+    assert versions == [(1,), (2,)]
 
 
 def test_newer_schema_version_is_rejected_safely(tmp_path):

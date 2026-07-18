@@ -222,3 +222,148 @@ class AuditEvent(BaseModel):
     message: str | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: datetime
+
+
+class WorkflowStatus(str, Enum):
+    CREATED = "created"
+    RUNNING = "running"
+    WAITING_FOR_APPROVAL = "waiting_for_approval"
+    PAUSED = "paused"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class WorkflowStepStatus(str, Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+    WAITING = "waiting"
+    BLOCKED = "blocked"
+
+
+class WorkflowCondition(BaseModel):
+    type: Literal["always", "input_present", "input_equals", "previous_step_succeeded", "previous_step_output_present"] = "always"
+    key: str | None = Field(default=None, max_length=100)
+    value: Any = None
+    step_id: str | None = Field(default=None, max_length=100)
+
+
+class WorkflowStepDefinition(BaseModel):
+    step_id: str = Field(min_length=1, max_length=100)
+    name: str = Field(min_length=1, max_length=200)
+    agent: str = Field(min_length=1, max_length=100)
+    action: str = Field(min_length=1, max_length=100)
+    depends_on: list[str] = Field(default_factory=list, max_length=20)
+    condition: WorkflowCondition = Field(default_factory=WorkflowCondition)
+    requires_approval: bool = False
+    max_retries: int = Field(default=0, ge=0, le=5)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("step_id", "name", "agent", "action")
+    @classmethod
+    def non_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Wert darf nicht leer sein.")
+        return value
+
+
+class WorkflowDefinition(BaseModel):
+    definition_id: str = Field(min_length=1, max_length=100)
+    name: str = Field(min_length=1, max_length=200)
+    description: str = Field(default="", max_length=2000)
+    version: str = Field(default="1.0", max_length=30)
+    steps: list[WorkflowStepDefinition] = Field(min_length=1, max_length=50)
+    enabled: bool = True
+
+    @model_validator(mode="after")
+    def validate_graph(self):
+        ids = [step.step_id for step in self.steps]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Doppelte step_ids sind nicht erlaubt.")
+        known = set(ids)
+        for step in self.steps:
+            if any(dep not in known for dep in step.depends_on):
+                raise ValueError("depends_on enthält eine unbekannte step_id.")
+        graph = {step.step_id: step.depends_on for step in self.steps}
+        visiting: set[str] = set(); visited: set[str] = set()
+        def visit(node: str):
+            if node in visiting: raise ValueError("Zyklische Workflow-Abhängigkeit.")
+            if node in visited: return
+            visiting.add(node)
+            for dep in graph[node]: visit(dep)
+            visiting.remove(node); visited.add(node)
+        for node in ids: visit(node)
+        return self
+
+
+class WorkflowStartRequest(BaseModel):
+    definition_id: str | None = Field(default=None, min_length=1, max_length=100)
+    workflow_type: str | None = Field(default=None, min_length=1, max_length=100)
+    input: dict[str, Any] = Field(default_factory=dict)
+    requested_by: str | None = Field(default=None, max_length=100)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def definition_required(self):
+        if not (self.definition_id or self.workflow_type):
+            raise ValueError("definition_id oder workflow_type ist erforderlich.")
+        return self
+
+
+class WorkflowStepState(BaseModel):
+    step_id: str
+    status: WorkflowStepStatus
+    attempt: int = 0
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    error: str | None = None
+    input: dict[str, Any] = Field(default_factory=dict)
+    output: dict[str, Any] = Field(default_factory=dict)
+
+
+class WorkflowInstanceResponse(BaseModel):
+    workflow_id: str
+    definition_id: str
+    name: str
+    status: WorkflowStatus
+    current_step_id: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    completed_at: datetime | None = None
+    requested_by: str | None = None
+    input: dict[str, Any] = Field(default_factory=dict)
+    output: dict[str, Any] = Field(default_factory=dict)
+    steps: list[WorkflowStepState] = Field(default_factory=list)
+    approval_required: bool = True
+    approval_id: str | None = None
+    safe: bool = True
+    execution_mode: Literal["simulation"] = "simulation"
+    external_actions_performed: bool = False
+
+
+class WorkflowResumeRequest(BaseModel):
+    actor: str | None = Field(default=None, max_length=100)
+    reason: str | None = Field(default=None, max_length=1000)
+
+class WorkflowRetryRequest(WorkflowResumeRequest):
+    step_id: str = Field(min_length=1, max_length=100)
+
+class WorkflowCancelRequest(WorkflowResumeRequest): pass
+
+class WorkflowEngineStatusResponse(BaseModel):
+    enabled: bool = True
+    persistent: bool = True
+    persistence: Literal["sqlite"] = "sqlite"
+    simulation_only: bool = True
+    external_actions_allowed: bool = False
+    supported_workflow_statuses: list[WorkflowStatus]
+    supported_step_statuses: list[WorkflowStepStatus]
+    retry_enabled: bool = True
+    resume_enabled: bool = True
+    approval_integration: bool = True
+    audit_enabled: bool = True
+    safe: bool = True
