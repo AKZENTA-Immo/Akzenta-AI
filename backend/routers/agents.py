@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from backend.agents.core import AgentPermissionError
 from backend.agents.manager import agent_manager
@@ -6,6 +6,7 @@ from backend.agents.services import (
     ApprovalAlreadyExecuted, ApprovalConflict, ApprovalExpired, ApprovalNotApproved,
     ApprovalNotFound, WorkflowIntegrityError, WorkflowNotFound,
 )
+from backend.agents.workflow_repository import PersistenceError, UnsupportedSchemaVersion
 from backend.agents.base_agent import AgentRequest, AgentResponse
 from backend.agents.registry import agent_registry
 from backend.agents.suite import register_default_agents
@@ -32,6 +33,8 @@ def _run(call):
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except (ApprovalConflict, ApprovalAlreadyExecuted, WorkflowIntegrityError) as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except (PersistenceError, UnsupportedSchemaVersion) as exc:
+        raise HTTPException(status_code=500, detail="Der persistente Workflow-Speicher ist derzeit nicht verfügbar.") from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail="Die Agentenanfrage konnte nicht sicher verarbeitet werden.") from exc
 
@@ -41,6 +44,14 @@ def statuses(): return {"agents": agent_manager.statuses(), "external_actions_en
 
 @router.get("/approvals/status", response_model=ApprovalStatusResponse)
 def approval_status(): return agent_manager.approvals.get_status()
+
+@router.get("/approvals", response_model=list[ApprovalRecord])
+def list_approvals(
+    workflow_id: str | None = None,
+    status: str | None = Query(default=None, pattern="^(pending|approved|rejected|expired|executed)$"),
+    limit: int = Query(default=50, ge=1, le=100),
+):
+    return _run(lambda: agent_manager.repository.list_approvals(limit, workflow_id, status))
 
 @router.post("/approvals", response_model=ApprovalRecord)
 def create_approval(request: ApprovalCreateRequest):
@@ -85,6 +96,27 @@ def workflow_core_status(): return agent_manager.workflow_core.status()
 
 @router.post("/workflows/core/run", response_model=WorkflowCoreResponse)
 def workflow_core_run(request: WorkflowCoreRequest): return _run(lambda: agent_manager.workflow_core.run(request))
+
+@router.get("/workflows", response_model=list[dict])
+def list_workflows(status: str | None = Query(default=None, pattern="^(completed|executed)$"), limit: int = Query(default=50, ge=1, le=100)):
+    return _run(lambda: [workflow.public_response() for workflow in agent_manager.repository.list_workflows(limit, status)])
+
+@router.get("/workflows/{workflow_id}", response_model=dict)
+def get_workflow(workflow_id: str):
+    def load():
+        workflow = agent_manager.repository.get_workflow(workflow_id)
+        if workflow is None:
+            raise WorkflowNotFound("Workflow wurde nicht gefunden.")
+        return workflow.public_response()
+    return _run(load)
+
+@router.get("/workflows/{workflow_id}/audit")
+def get_workflow_audit(workflow_id: str, limit: int = Query(default=100, ge=1, le=100)):
+    def load():
+        if not agent_manager.repository.workflow_exists(workflow_id):
+            raise WorkflowNotFound("Workflow wurde nicht gefunden.")
+        return agent_manager.repository.get_workflow_audit(workflow_id, limit)
+    return _run(load)
 
 @router.post("/{agent_name}/execute", response_model=AgentResponse)
 def direct_execute(agent_name: str, request: AgentRequest):

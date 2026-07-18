@@ -120,6 +120,31 @@ class WorkflowCoreResponse(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class WorkflowRecord(BaseModel):
+    workflow_id: str
+    created_at: datetime
+    updated_at: datetime
+    status: str
+    workflow_fingerprint: str
+    request_payload: dict[str, Any]
+    response_payload: dict[str, Any]
+    approval_required: bool
+    external_actions_performed: bool = False
+    execution_mode: Literal["simulation", "dry_run"] = "simulation"
+    executed_at: datetime | None = None
+
+    def public_response(self) -> dict[str, Any]:
+        response = dict(self.response_payload)
+        response.update({
+            "workflow_id": self.workflow_id, "status": self.status,
+            "created_at": self.created_at, "updated_at": self.updated_at,
+            "approval_required": self.approval_required, "execution_mode": self.execution_mode,
+            "external_actions_performed": self.external_actions_performed,
+        })
+        response.pop("workflow_fingerprint", None)
+        return response
+
+
 class ApprovalStatus(str, Enum):
     PENDING = "pending"
     APPROVED = "approved"
@@ -175,7 +200,25 @@ class ApprovalExecutionResponse(BaseModel):
 class ApprovalStatusResponse(BaseModel):
     enabled: bool = True
     mode: Literal["simulation"] = "simulation"
-    persistent: bool = False
+    persistent: bool = True
+    persistence: Literal["sqlite"] = "sqlite"
     external_actions_allowed: bool = False
+    audit_enabled: bool = True
+    database_configured: bool = True
     supported_statuses: list[ApprovalStatus]
     safety_guards: list[str]
+
+
+class AuditEvent(BaseModel):
+    event_id: str
+    entity_type: str
+    entity_id: str
+    workflow_id: str | None = None
+    approval_id: str | None = None
+    event_type: str
+    previous_status: str | None = None
+    new_status: str | None = None
+    actor: str | None = None
+    message: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime

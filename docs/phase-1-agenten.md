@@ -100,6 +100,35 @@ POST /agents/approvals/apr_.../execute
 
 Der Speicher ist absichtlich nur In-Memory, thread-sicher und nicht persistent: Bei Prozessneustart gehen vorbereitete Workflows und Freigaben verloren; mehrere Serverprozesse teilen den Zustand nicht. Es gibt keine Datenbankmigration und keinen externen Connector. Version 1.7b versendet auch nach Freigabe keine E-Mail, erstellt keinen Kalendertermin und ändert keine CRM-Daten. Eine Freigabe erlaubt ausschließlich die Markierung einer lokalen Simulation als ausgeführt.
 
+## Version 1.7c: persistente Workflow-Engine
+
+Version 1.7c ersetzt die prozesslokalen Dictionaries durch eine SQLite-Repository-Schicht aus der Python-Standardbibliothek. Standardmäßig liegt die Datenbank unter `data/workflow_engine.sqlite3`; `AKZENTA_WORKFLOW_DB` kann einen anderen Pfad vorgeben. Tests injizieren stets eine temporäre Datenbank. SQLite-Verbindungen werden pro Operation geöffnet, Foreign Keys und WAL-Modus aktiviert und zusammengehörige Status- und Auditänderungen in Transaktionen gespeichert.
+
+Das Schema Version 1 umfasst `workflows`, `approvals`, `audit_events` und `schema_version`. Gespeichert werden Workflow-Anfrage und vollständige Antwort als stabiles UTF-8-JSON, SHA-256-Fingerprint, Status und Ausführungszeitpunkte sowie Freigabeentscheidungen, Ablaufzeiten und die chronologische Historie. Die Initialisierung ist idempotent, überschreibt keine Bestandsdaten und bricht bei einer unbekannten neueren Schema-Version sicher ab. Damit bleiben vorbereitete, genehmigte, abgelehnte, abgelaufene und bereits simuliert ausgeführte Vorgänge nach einer Neuinitialisierung der Services erhalten.
+
+Neue Lese-Endpunkte:
+
+| Methode | Endpunkt | Verhalten |
+|---|---|---|
+| GET | `/agents/workflows` | Neueste Workflows, optional nach Status, maximal 100 |
+| GET | `/agents/workflows/{workflow_id}` | Persistierter Workflow mit vorbereiteten Schritten |
+| GET | `/agents/workflows/{workflow_id}/audit` | Unveränderbare chronologische Workflow-Historie |
+| GET | `/agents/approvals` | Freigaben, optional nach Workflow oder Status, maximal 100 |
+
+Das Audit-Log erfasst unter anderem `workflow_created`, `approval_created`, Genehmigung oder Ablehnung, Ablauf, blockierte Ausführungen, Integritätsfehler sowie Start und Abschluss einer Simulation. Es enthält nur notwendige Akteure, Status und knappe Gründe, keine Zugangsdaten. Der Fingerprint wird aus stabil serialisierten sicherheitsrelevanten Workflow-Daten berechnet und unmittelbar vor Ausführung erneut geprüft. Ein bedingtes SQLite-Update von `approved` nach `executed` verhindert doppelte oder parallele Ausführung.
+
+Beispielablauf:
+
+1. Workflow über `POST /agents/workflows/core/run` vorbereiten und dauerhaft speichern.
+2. Approval über `POST /agents/approvals` erstellen.
+3. Server oder Services mit demselben Datenbankpfad neu initialisieren.
+4. Approval weiterhin über `GET /agents/approvals/{approval_id}` abrufen.
+5. Approval genehmigen.
+6. Genehmigten Workflow genau einmal lokal simulieren.
+7. Historie über `GET /agents/workflows/{workflow_id}/audit` abrufen.
+
+Sicherheitsgrenzen und bekannte Grenzen: Persistenz bedeutet keine automatische externe Ausführung. Auch Version 1.7c sendet keine E-Mail, erstellt keinen Kalendertermin und verändert keine CRM-Daten; `external_actions_performed` bleibt immer `false`. SQLite eignet sich für die lokale Einzelinstanz. Für einen späteren verteilten Betrieb mit mehreren Servern kann PostgreSQL erforderlich werden. Rollen im Request sind weiterhin keine produktive Authentifizierung, und Audit-Ereignisse sind über die API weder änderbar noch löschbar.
+
 ## Fehlerbehandlung
 
 - Pydantic-Validierungsfehler: HTTP 422.

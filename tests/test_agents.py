@@ -1,4 +1,9 @@
+import os
+import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+
+os.environ["AKZENTA_WORKFLOW_DB"] = str(Path(__file__).resolve().parent.parent / ".tmp" / "pytest-import-workflows.sqlite3")
 
 import pytest
 from fastapi.testclient import TestClient
@@ -7,6 +12,9 @@ from backend import config
 from backend.adapters.providers import MockGmailAdapter, ProviderNotConnected
 from backend.main import app
 from backend.agents.manager import agent_manager
+from backend.agents.services import ApprovalService
+from backend.agents.workflow_repository import WorkflowRepository
+from backend.agents.workflow_repository import UnsupportedSchemaVersion
 
 
 client = TestClient(app)
@@ -15,9 +23,10 @@ client = TestClient(app)
 @pytest.fixture(autouse=True)
 def isolated_audit(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "AGENT_AUDIT_LOG", tmp_path / "audit.jsonl")
-    with agent_manager.approvals._lock:
-        agent_manager.approvals._workflows.clear()
-        agent_manager.approvals._approvals.clear()
+    repository = WorkflowRepository(tmp_path / "workflow.sqlite3")
+    agent_manager.repository = repository
+    agent_manager.approvals = ApprovalService(repository)
+    agent_manager.workflow_core.approvals = agent_manager.approvals
 
 
 def prepare_workflow(lead_id="LEAD-APPROVAL"):
@@ -137,16 +146,19 @@ def test_global_agent_status_includes_safe_workflow_core():
     assert response.json()["external_actions"] is False
     assert response.json()["approval_required"] is True
     assert response.json()["execution_mode"] == "simulation"
-    assert response.json()["persistence"] == "in_memory"
+    assert response.json()["persistence"] == "sqlite"
+    assert response.json()["restart_safe"] is True
     workflow = next(item for item in response.json()["agents"] if item["agent"] == "workflow_core")
     assert workflow["provider_connected"] is False
     assert workflow["external_actions_enabled"] is False
 
 
-def test_approval_status_is_safe_and_in_memory():
+def test_approval_status_is_safe_and_persistent():
     body = client.get("/agents/approvals/status").json()
     assert body["enabled"] is True and body["mode"] == "simulation"
-    assert body["persistent"] is False and body["external_actions_allowed"] is False
+    assert body["persistent"] is True and body["persistence"] == "sqlite"
+    assert body["audit_enabled"] is True and body["database_configured"] is True
+    assert body["external_actions_allowed"] is False
     assert set(body["supported_statuses"]) == {"pending", "approved", "rejected", "expired", "executed"}
 
 
@@ -183,8 +195,8 @@ def test_rejected_approval_cannot_execute_or_change_again():
 
 def test_expired_approval_cannot_be_decided_or_executed():
     approval = create_approval(prepare_workflow()["workflow_id"])
-    stored = agent_manager.approvals._approvals[approval["approval_id"]]
-    stored.expires_at = stored.created_at
+    with sqlite3.connect(agent_manager.repository.database_path) as connection:
+        connection.execute("UPDATE approvals SET expires_at=created_at WHERE approval_id=?", (approval["approval_id"],))
     assert client.post(f"/agents/approvals/{approval['approval_id']}/decision", json={"decision": "approved"}).status_code == 410
     assert client.post(f"/agents/approvals/{approval['approval_id']}/execute").status_code == 410
     assert client.get(f"/agents/approvals/{approval['approval_id']}").json()["status"] == "expired"
@@ -194,17 +206,96 @@ def test_workflow_fingerprint_tampering_blocks_execution():
     workflow = prepare_workflow()
     approval = create_approval(workflow["workflow_id"])
     assert client.post(f"/agents/approvals/{approval['approval_id']}/decision", json={"decision": "approved"}).status_code == 200
-    agent_manager.approvals._workflows[workflow["workflow_id"]].steps[0].output["note_preview"] = "manipuliert"
+    with sqlite3.connect(agent_manager.repository.database_path) as connection:
+        row = connection.execute("SELECT response_payload FROM workflows WHERE workflow_id=?", (workflow["workflow_id"],)).fetchone()
+        connection.execute("UPDATE workflows SET response_payload=? WHERE workflow_id=?", (row[0].replace("Workflow-Vorschau", "MANIPULIERT"), workflow["workflow_id"]))
     assert client.post(f"/agents/approvals/{approval['approval_id']}/execute").status_code == 409
     assert client.get(f"/agents/approvals/{approval['approval_id']}").json()["status"] == "approved"
+    events = client.get(f"/agents/workflows/{workflow['workflow_id']}/audit").json()
+    assert events[-1]["event_type"] == "integrity_check_failed"
 
 
 def test_approval_cannot_be_reassigned_to_another_workflow():
     first, second = prepare_workflow("LEAD-FIRST"), prepare_workflow("LEAD-SECOND")
     approval = create_approval(first["workflow_id"])
     assert client.post(f"/agents/approvals/{approval['approval_id']}/decision", json={"decision": "approved"}).status_code == 200
-    agent_manager.approvals._approvals[approval["approval_id"]].workflow_id = second["workflow_id"]
+    with sqlite3.connect(agent_manager.repository.database_path) as connection:
+        connection.execute("UPDATE approvals SET workflow_id=? WHERE approval_id=?", (second["workflow_id"], approval["approval_id"]))
     assert client.post(f"/agents/approvals/{approval['approval_id']}/execute").status_code == 409
+
+
+def test_workflow_is_retrievable_listed_and_audited():
+    workflow = prepare_workflow("LEAD-PERSIST")
+    fetched = client.get(f"/agents/workflows/{workflow['workflow_id']}")
+    assert fetched.status_code == 200
+    assert fetched.json()["steps"] == workflow["steps"]
+    assert fetched.json()["external_actions_performed"] is False
+    assert client.get("/agents/workflows?limit=1").json()[0]["workflow_id"] == workflow["workflow_id"]
+    assert client.get("/agents/workflows?limit=101").status_code == 422
+    assert client.get("/agents/workflows/wf_missing").status_code == 404
+    audit = client.get(f"/agents/workflows/{workflow['workflow_id']}/audit").json()
+    assert [event["event_type"] for event in audit] == ["workflow_created"]
+
+
+def test_schema_and_state_survive_repository_and_service_recreation():
+    workflow = prepare_workflow("LEAD-RESTART")
+    approval = create_approval(workflow["workflow_id"])
+    client.post(f"/agents/approvals/{approval['approval_id']}/decision", json={"decision": "approved"})
+    repository = WorkflowRepository(agent_manager.repository.database_path)
+    service = ApprovalService(repository)
+    assert repository.get_workflow(workflow["workflow_id"]) is not None
+    assert service.get_approval(approval["approval_id"]).status.value == "approved"
+    service.execute_approved_workflow(approval["approval_id"])
+    assert ApprovalService(WorkflowRepository(repository.database_path)).get_approval(approval["approval_id"]).status.value == "executed"
+
+
+def test_schema_is_complete_and_idempotent():
+    WorkflowRepository(agent_manager.repository.database_path)
+    with sqlite3.connect(agent_manager.repository.database_path) as connection:
+        tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        versions = connection.execute("SELECT version FROM schema_version").fetchall()
+    assert {"workflows", "approvals", "audit_events", "schema_version"} <= tables
+    assert versions == [(1,)]
+
+
+def test_newer_schema_version_is_rejected_safely(tmp_path):
+    database = tmp_path / "newer.sqlite3"
+    with sqlite3.connect(database) as connection:
+        connection.execute("CREATE TABLE schema_version (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)")
+        connection.execute("INSERT INTO schema_version VALUES (999, '2026-07-18T00:00:00+00:00')")
+    with pytest.raises(UnsupportedSchemaVersion):
+        WorkflowRepository(database)
+
+
+def test_parallel_execution_has_exactly_one_success():
+    workflow = prepare_workflow("LEAD-CONCURRENT")
+    approval = create_approval(workflow["workflow_id"])
+    client.post(f"/agents/approvals/{approval['approval_id']}/decision", json={"decision": "approved"})
+
+    def execute():
+        service = ApprovalService(WorkflowRepository(agent_manager.repository.database_path))
+        try:
+            service.execute_approved_workflow(approval["approval_id"])
+            return "executed"
+        except Exception as exc:
+            return type(exc).__name__
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda _: execute(), range(2)))
+    assert results.count("executed") == 1
+    assert results.count("ApprovalAlreadyExecuted") == 1
+
+
+def test_audit_captures_approval_decision_execution_and_integrity_failure():
+    workflow = prepare_workflow("LEAD-AUDIT")
+    approval = create_approval(workflow["workflow_id"])
+    client.post(f"/agents/approvals/{approval['approval_id']}/decision", json={"decision": "approved", "decided_by": "tester"})
+    assert client.post(f"/agents/approvals/{approval['approval_id']}/execute").status_code == 200
+    events = client.get(f"/agents/workflows/{workflow['workflow_id']}/audit").json()
+    assert [event["event_type"] for event in events] == [
+        "workflow_created", "approval_created", "approval_approved", "execution_started", "execution_completed"
+    ]
+    assert [event["created_at"] for event in events] == sorted(event["created_at"] for event in events)
 
 
 def test_viewer_cannot_create_drafts():

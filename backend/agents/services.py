@@ -1,21 +1,17 @@
 import hashlib
 import json
-import logging
-from copy import deepcopy
 from datetime import datetime, timedelta, timezone
-from threading import RLock
 from uuid import uuid4
 
 from backend.adapters.providers import CalendarAdapter, GmailAdapter, OnOfficeAdapter
 from backend.agents.core import AuditLogger, PromptLoader, require_role, safe_facts
+from backend.agents.workflow_repository import ConcurrentUpdateError, WorkflowRepository
 from backend.models.agent_models import (
     AgentRole, AgentStatus, ApprovalExecutionResponse, ApprovalRecord, ApprovalState,
     ApprovalStatus, ApprovalStatusResponse, CalendarSimulationRequest, CrmPreviewRequest,
     EmailDraftRequest, StructuredAgentResponse, WorkflowCoreRequest, WorkflowCoreResponse,
     WorkflowStepResult,
 )
-
-logger = logging.getLogger("akzenta.agents.approvals")
 
 
 class WorkflowNotFound(LookupError): pass
@@ -28,13 +24,11 @@ class WorkflowIntegrityError(RuntimeError): pass
 
 
 class ApprovalService:
-    """Thread-safe, process-local store. All executions are simulations only."""
+    """Persistent approval rules. All executions remain simulations only."""
 
-    def __init__(self, now=None):
+    def __init__(self, repository: WorkflowRepository, now=None):
+        self.repository = repository
         self._now = now or (lambda: datetime.now(timezone.utc))
-        self._lock = RLock()
-        self._workflows: dict[str, WorkflowCoreResponse] = {}
-        self._approvals: dict[str, ApprovalRecord] = {}
 
     @staticmethod
     def _fingerprint(workflow: WorkflowCoreResponse) -> str:
@@ -53,86 +47,81 @@ class ApprovalService:
             safety_guards=["approval_required", "expiry_check", "single_execution", "workflow_fingerprint", "simulation_only"],
         )
 
-    def register_workflow(self, workflow: WorkflowCoreResponse) -> WorkflowCoreResponse:
-        with self._lock:
-            workflow.workflow_fingerprint = self._fingerprint(workflow)
-            self._workflows[workflow.workflow_id] = deepcopy(workflow)
-            return workflow
+    def register_workflow(self, request: WorkflowCoreRequest, workflow: WorkflowCoreResponse) -> WorkflowCoreResponse:
+        workflow.workflow_fingerprint = self._fingerprint(workflow)
+        self.repository.save_workflow(request.model_dump(mode="json"), workflow)
+        return workflow
 
-    def _refresh_expiry(self, approval: ApprovalRecord) -> None:
-        if approval.status in {ApprovalStatus.PENDING, ApprovalStatus.APPROVED} and self._now() >= approval.expires_at:
-            approval.status = ApprovalStatus.EXPIRED
+    def _refresh_expiry(self, approval: ApprovalRecord) -> ApprovalRecord:
+        return self.repository.expire_approval(approval.approval_id, self._now()) or approval
+
+    def _blocked(self, approval: ApprovalRecord, message: str) -> None:
+        self.repository.add_audit_event(
+            entity_type="approval", entity_id=approval.approval_id, workflow_id=approval.workflow_id,
+            approval_id=approval.approval_id, event_type="execution_blocked",
+            previous_status=approval.status.value, new_status=approval.status.value, message=message,
+        )
 
     def create_approval(self, workflow_id: str, expires_in_minutes: int = 30, requested_by: str | None = None) -> ApprovalRecord:
-        with self._lock:
-            workflow = self._workflows.get(workflow_id)
-            if workflow is None:
-                raise WorkflowNotFound("Workflow wurde nicht gefunden.")
-            fingerprint = self._fingerprint(workflow)
-            for approval in self._approvals.values():
-                self._refresh_expiry(approval)
-                if approval.workflow_id == workflow_id and approval.workflow_fingerprint == fingerprint and approval.status == ApprovalStatus.PENDING:
-                    return deepcopy(approval)  # Idempotent for an unchanged pending workflow.
-            now = self._now()
-            approval = ApprovalRecord(
-                approval_id=f"apr_{uuid4().hex}", workflow_id=workflow_id, status=ApprovalStatus.PENDING,
-                created_at=now, expires_at=now + timedelta(minutes=expires_in_minutes),
-                requested_by=requested_by, workflow_fingerprint=fingerprint,
-            )
-            self._approvals[approval.approval_id] = approval
-            logger.info("approval_created", extra={"approval_id": approval.approval_id, "workflow_id": workflow_id, "status": approval.status.value})
-            return deepcopy(approval)
+        workflow = self.repository.get_workflow(workflow_id)
+        if workflow is None:
+            raise WorkflowNotFound("Workflow wurde nicht gefunden.")
+        pending = self.repository.get_pending_approval_for_workflow(workflow_id)
+        if pending:
+            pending = self._refresh_expiry(pending)
+            if pending.status == ApprovalStatus.PENDING and pending.workflow_fingerprint == workflow.workflow_fingerprint:
+                return pending
+        now = self._now()
+        return self.repository.save_approval(ApprovalRecord(
+            approval_id=f"apr_{uuid4().hex}", workflow_id=workflow_id, status=ApprovalStatus.PENDING,
+            created_at=now, expires_at=now + timedelta(minutes=expires_in_minutes),
+            requested_by=requested_by, workflow_fingerprint=workflow.workflow_fingerprint,
+        ))
 
     def get_approval(self, approval_id: str) -> ApprovalRecord:
-        with self._lock:
-            approval = self._approvals.get(approval_id)
-            if approval is None:
-                raise ApprovalNotFound("Freigabe wurde nicht gefunden.")
-            self._refresh_expiry(approval)
-            return deepcopy(approval)
+        approval = self.repository.get_approval(approval_id)
+        if approval is None:
+            raise ApprovalNotFound("Freigabe wurde nicht gefunden.")
+        return self._refresh_expiry(approval)
 
     def decide_approval(self, approval_id: str, decision: str, decided_by: str | None = None, reason: str | None = None) -> ApprovalRecord:
-        with self._lock:
-            approval = self._approvals.get(approval_id)
-            if approval is None:
-                raise ApprovalNotFound("Freigabe wurde nicht gefunden.")
-            self._refresh_expiry(approval)
-            if approval.status == ApprovalStatus.EXPIRED:
-                raise ApprovalExpired("Freigabe ist abgelaufen.")
-            if approval.status != ApprovalStatus.PENDING:
-                raise ApprovalConflict("Nur eine ausstehende Freigabe kann entschieden werden.")
-            approval.status = ApprovalStatus(decision)
-            approval.decided_at = self._now()
-            approval.decided_by = decided_by
-            approval.reason = reason
-            logger.info("approval_decided", extra={"approval_id": approval.approval_id, "workflow_id": approval.workflow_id, "status": approval.status.value})
-            return deepcopy(approval)
+        approval = self.get_approval(approval_id)
+        if approval.status == ApprovalStatus.EXPIRED:
+            raise ApprovalExpired("Freigabe ist abgelaufen.")
+        if approval.status != ApprovalStatus.PENDING:
+            raise ApprovalConflict("Nur eine ausstehende Freigabe kann entschieden werden.")
+        try:
+            return self.repository.update_approval_decision(approval_id, ApprovalStatus(decision), self._now(), decided_by, reason)
+        except ConcurrentUpdateError as exc:
+            raise ApprovalConflict("Freigabestatus wurde zwischenzeitlich geändert.") from exc
 
     def execute_approved_workflow(self, approval_id: str) -> ApprovalExecutionResponse:
-        with self._lock:
-            approval = self._approvals.get(approval_id)
-            if approval is None:
-                raise ApprovalNotFound("Freigabe wurde nicht gefunden.")
-            self._refresh_expiry(approval)
-            if approval.status == ApprovalStatus.EXPIRED:
-                raise ApprovalExpired("Freigabe ist abgelaufen.")
-            if approval.status == ApprovalStatus.EXECUTED:
-                raise ApprovalAlreadyExecuted("Freigabe wurde bereits ausgeführt.")
-            if approval.status != ApprovalStatus.APPROVED:
-                raise ApprovalNotApproved("Workflow ist nicht freigegeben.")
-            workflow = self._workflows.get(approval.workflow_id)
-            if workflow is None:
-                raise WorkflowNotFound("Workflow wurde nicht gefunden.")
-            if workflow.workflow_id != approval.workflow_id or self._fingerprint(workflow) != approval.workflow_fingerprint:
-                raise WorkflowIntegrityError("Workflow-Integritätsprüfung fehlgeschlagen.")
-            approval.status = ApprovalStatus.EXECUTED
-            approval.executed_at = self._now()
-            logger.info("approval_executed", extra={"approval_id": approval.approval_id, "workflow_id": workflow.workflow_id, "status": approval.status.value, "execution_mode": "simulation"})
-            return ApprovalExecutionResponse(
-                approval_id=approval.approval_id, workflow_id=workflow.workflow_id,
-                executed_steps=[step.step for step in workflow.steps],
-                message="Freigegebener Workflow wurde ausschließlich lokal simuliert; keine externe Aktion wurde ausgeführt.",
-            )
+        approval = self.get_approval(approval_id)
+        if approval.status == ApprovalStatus.EXPIRED:
+            self._blocked(approval, "Freigabe ist abgelaufen.")
+            raise ApprovalExpired("Freigabe ist abgelaufen.")
+        if approval.status == ApprovalStatus.EXECUTED:
+            self._blocked(approval, "Freigabe wurde bereits ausgeführt.")
+            raise ApprovalAlreadyExecuted("Freigabe wurde bereits ausgeführt.")
+        if approval.status != ApprovalStatus.APPROVED:
+            self._blocked(approval, "Workflow ist nicht freigegeben.")
+            raise ApprovalNotApproved("Workflow ist nicht freigegeben.")
+        stored = self.repository.get_workflow(approval.workflow_id)
+        if stored is None:
+            raise WorkflowNotFound("Workflow wurde nicht gefunden.")
+        workflow = WorkflowCoreResponse.model_validate(stored.response_payload)
+        calculated = self._fingerprint(workflow)
+        try:
+            updated = self.repository.mark_approval_executed(approval_id, approval.workflow_fingerprint, calculated, self._now())
+        except ConcurrentUpdateError as exc:
+            raise ApprovalAlreadyExecuted("Freigabe wurde bereits ausgeführt.") from exc
+        if updated.status != ApprovalStatus.EXECUTED:
+            raise WorkflowIntegrityError("Workflow-Integritätsprüfung fehlgeschlagen.")
+        return ApprovalExecutionResponse(
+            approval_id=approval.approval_id, workflow_id=workflow.workflow_id,
+            executed_steps=[step.step for step in workflow.steps],
+            message="Freigegebener Workflow wurde ausschließlich lokal simuliert; keine externe Aktion wurde ausgeführt.",
+        )
 
 
 class BaseAgentService:
@@ -276,4 +265,4 @@ class WorkflowCoreService:
             request_id=response.request_id,
             result=response.status,
         )
-        return self.approvals.register_workflow(response)
+        return self.approvals.register_workflow(request, response)
