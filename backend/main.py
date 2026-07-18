@@ -3,9 +3,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend import config
+from backend.routers.dokument_ordner import router as dokument_ordner_router
 from backend.routers.dokumente import router as dokumente_router
 from backend.routers.wissensbasis import router as wissensbasis_router
 from backend.routers.chat import router as chat_router
+from backend.routers.agents import router as agents_router
 from backend.responses import UTF8JSONResponse
 
 
@@ -18,8 +20,10 @@ app.add_middleware(
     allow_headers=["Content-Type", "Accept"],
 )
 app.include_router(dokumente_router)
+app.include_router(dokument_ordner_router)
 app.include_router(wissensbasis_router)
 app.include_router(chat_router)
+app.include_router(agents_router)
 
 
 @app.get("/")

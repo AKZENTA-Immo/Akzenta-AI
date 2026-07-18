@@ -1,11 +1,12 @@
-import { BarChart3, Bot, Building2, ChevronLeft, ChevronRight, FileText, Home, Lightbulb, Megaphone, Phone, Settings, Users } from 'lucide-react'
+import { BarChart3, Bot, Building2, CalendarDays, ChevronLeft, ChevronRight, FileText, Home, Lightbulb, Mail, Megaphone, Phone, Settings, Users } from 'lucide-react'
 import logo from '../assets/akzenta-logo-original.png'
 
-export type Page = 'dashboard' | 'chat' | 'knowledge' | 'documents' | 'sellers' | 'objects' | 'leads' | 'marketing' | 'phone' | 'settings'
+export type Page = 'dashboard' | 'chat' | 'knowledge' | 'documents' | 'crm' | 'email' | 'calendar' | 'sellers' | 'objects' | 'leads' | 'marketing' | 'phone' | 'settings'
 
 const items = [
   { id: 'dashboard', label: 'Dashboard', icon: BarChart3 }, { id: 'chat', label: 'AKZENTA AI', icon: Bot },
   { id: 'knowledge', label: 'Wissensbasis', icon: Lightbulb }, { id: 'documents', label: 'Dokumente', icon: FileText },
+  { id: 'crm', label: 'CRM-Agent', icon: Users }, { id: 'email', label: 'E-Mail-Agent', icon: Mail }, { id: 'calendar', label: 'Termin-Agent', icon: CalendarDays },
   { id: 'sellers', label: 'Verkäufer', icon: Users }, { id: 'objects', label: 'Objekte', icon: Building2 },
   { id: 'leads', label: 'Leads', icon: Home }, { id: 'marketing', label: 'Marketing', icon: Megaphone },
   { id: 'phone', label: 'Telefon-Agent', icon: Phone }, { id: 'settings', label: 'Einstellungen', icon: Settings },

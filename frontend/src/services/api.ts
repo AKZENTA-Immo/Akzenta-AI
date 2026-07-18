@@ -1,6 +1,6 @@
-import type { ChatRequest, ChatResponse, ChatStatus, DocumentDetails, DocumentFilters, DocumentListResponse, DocumentSectionsResponse, DocumentStatistics, IndexingResponse, KnowledgeStatus } from '../models/api'
+import type { AgentKind, AgentResponse, AgentStatus, BackendInfo, ChatRequest, ChatResponse, ChatStatus, DocumentDetails, DocumentFilters, DocumentListResponse, DocumentSectionsResponse, DocumentStatistics, IndexingResponse, KnowledgeStatus } from '../models/api'
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8011').replace(/\/$/, '')
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8010').replace(/\/$/, '')
 const REQUEST_TIMEOUT_MS = 210_000
 
 export class ApiError extends Error {
@@ -41,6 +41,7 @@ async function requestJson<T>(path: string, options: RequestInit = {}): Promise<
   }
 }
 
+export const getBackendInfo = (): Promise<BackendInfo> => requestJson('/')
 export const getChatStatus = (): Promise<ChatStatus> => requestJson('/chat/status')
 export const getKnowledgeStatus = (): Promise<KnowledgeStatus> => requestJson('/wissensbasis/status')
 
@@ -59,6 +60,11 @@ export const getDocuments = (filters: DocumentFilters, signal?: AbortSignal): Pr
   Object.entries(filters).forEach(([key, value]) => { if (value !== '') params.set(key, String(value)) })
   return requestJson(`/dokumente?${params}`, { signal })
 }
+
 export const getDocumentDetails = (id: string, signal?: AbortSignal): Promise<DocumentDetails> => requestJson(`/dokumente/${encodeURIComponent(id)}`, { signal })
 export const getDocumentSections = (id: string, limit = 5, offset = 0, signal?: AbortSignal): Promise<DocumentSectionsResponse> => requestJson(`/dokumente/${encodeURIComponent(id)}/abschnitte?limit=${limit}&offset=${offset}`, { signal })
 export const getDocumentStatistics = (signal?: AbortSignal): Promise<DocumentStatistics> => requestJson('/dokumente/statistik', { signal })
+export const getAgentStatus = (agent: AgentKind): Promise<AgentStatus> => requestJson(`/agents/${agent}/status`)
+export const createCrmPreview = (payload: { contact_reference: string; target_group: string; note: string }): Promise<AgentResponse> => requestJson('/agents/crm/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+export const createEmailDraft = (payload: { recipient_name: string; target_group: string; purpose: string; facts: string[] }): Promise<AgentResponse> => requestJson('/agents/email/draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+export const simulateAppointment = (payload: { attendee_name: string; purpose: string; preferred_start: string; duration_minutes: number; timezone: string }): Promise<AgentResponse> => requestJson('/agents/calendar/simulate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
