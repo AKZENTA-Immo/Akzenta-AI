@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { BackendInfo, ChatStatus, DocumentStatistics, KnowledgeStatus } from '../models/api'
-import { getBackendInfo, getChatStatus, getDocumentStatistics, getKnowledgeStatus } from '../services/api'
+import type { BackendInfo, ChatStatus, DocumentStatistics, KnowledgeStatus, OnOfficeStatus } from '../models/api'
+import { getBackendInfo, getChatStatus, getDocumentStatistics, getKnowledgeStatus, getOnOfficeStatus } from '../services/api'
 
 interface DashboardData {
   backend: BackendInfo
@@ -8,6 +8,7 @@ interface DashboardData {
   knowledge: KnowledgeStatus
   documents: DocumentStatistics
   responseTimeMs: number
+  onoffice: OnOfficeStatus
 }
 
 function StatusCard({ label, value, ok }: { label: string; value: string | number; ok: boolean }) {
@@ -33,11 +34,12 @@ export function DashboardPage() {
     const startedAt = performance.now()
 
     try {
-      const [backend, chat, knowledge, documents] = await Promise.all([
+      const [backend, chat, knowledge, documents, onoffice] = await Promise.all([
         getBackendInfo(),
         getChatStatus(),
         getKnowledgeStatus(),
         getDocumentStatistics(),
+        getOnOfficeStatus(),
       ])
 
       setData({
@@ -45,6 +47,7 @@ export function DashboardPage() {
         chat,
         knowledge,
         documents,
+        onoffice,
         responseTimeMs: Math.round(performance.now() - startedAt),
       })
     } catch (err) {
@@ -83,6 +86,7 @@ export function DashboardPage() {
             <StatusCard label="Wissensbasis" value={data.chat.chat_bereit ? 'Bereit' : 'Nicht bereit'} ok={data.chat.chat_bereit} />
             <StatusCard label="Dokumente" value={data.documents.gesamt} ok={data.documents.gesamt > 0} />
             <StatusCard label="Antwortzeit" value={`${data.responseTimeMs} ms`} ok={data.responseTimeMs < 5000} />
+            <StatusCard label="onOffice" value={!data.onoffice.enabled ? 'Deaktiviert' : data.onoffice.authenticated ? 'Lesemodus verbunden' : data.onoffice.mode === 'mock' ? 'Mock-Modus' : data.onoffice.error_code === 'authentication_failed' ? 'Authentifizierungsfehler' : 'Nicht erreichbar'} ok={!data.onoffice.enabled || data.onoffice.mode === 'mock' || data.onoffice.authenticated} />
           </section>
 
           <section className="system-details">
@@ -96,6 +100,7 @@ export function DashboardPage() {
               <div><dt>Indexierte Dokumente</dt><dd>{data.chat.indexierte_dokumente}</dd></div>
               <div><dt>Gespeicherte Abschnitte</dt><dd>{data.chat.gespeicherte_abschnitte}</dd></div>
               <div><dt>Letzte Indexierung</dt><dd>{data.knowledge.letzte_indexierung || 'Noch nicht verfügbar'}</dd></div>
+              <div><dt>onOffice-Konfiguration</dt><dd>{data.onoffice.configured ? 'Konfiguriert' : 'Nicht konfiguriert'}</dd></div>
             </dl>
           </section>
 

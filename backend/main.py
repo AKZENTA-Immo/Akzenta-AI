@@ -9,6 +9,7 @@ from backend.routers.wissensbasis import router as wissensbasis_router
 from backend.routers.chat import router as chat_router
 from backend.routers.agents import router as agents_router
 from backend.routers.agent_manager import router as agent_manager_router
+from backend.routers.onoffice import router as onoffice_router
 from backend.responses import UTF8JSONResponse
 
 
@@ -26,6 +27,7 @@ app.include_router(wissensbasis_router)
 app.include_router(chat_router)
 app.include_router(agents_router)
 app.include_router(agent_manager_router)
+app.include_router(onoffice_router)
 
 
 @app.get("/")

@@ -1,4 +1,4 @@
-import type { AgentExecutionResponse, AgentKind, AgentManagerResponse, AgentResponse, AgentStatus, BackendInfo, ChatRequest, ChatResponse, ChatStatus, DocumentDetails, DocumentFilters, DocumentListResponse, DocumentSectionsResponse, DocumentStatistics, IndexingResponse, KnowledgeStatus } from '../models/api'
+import type { AgentExecutionResponse, AgentKind, AgentManagerResponse, AgentResponse, AgentStatus, BackendInfo, ChatRequest, ChatResponse, ChatStatus, DocumentDetails, DocumentFilters, DocumentListResponse, DocumentSectionsResponse, DocumentStatistics, IndexingResponse, KnowledgeStatus, OnOfficeStatus } from '../models/api'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8010').replace(/\/$/, '')
 const REQUEST_TIMEOUT_MS = 210_000
@@ -70,3 +70,4 @@ export const createEmailDraft = (payload: { recipient_name: string; target_group
 export const simulateAppointment = (payload: { attendee_name: string; purpose: string; preferred_start: string; duration_minutes: number; timezone: string }): Promise<AgentResponse> => requestJson('/agents/calendar/simulate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
 export const routeAgentMessage = (message: string, simulation = true): Promise<AgentManagerResponse> => requestJson('/agent-manager/route', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, simulation }) })
 export const executeAgentMessage = (message: string, simulation = true): Promise<AgentExecutionResponse> => requestJson('/agent-manager/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, simulation }) })
+export const getOnOfficeStatus = (): Promise<OnOfficeStatus> => requestJson('/integrations/onoffice/status')

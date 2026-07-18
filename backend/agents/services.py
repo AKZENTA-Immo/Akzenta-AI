@@ -36,7 +36,18 @@ class CrmAgentService(BaseAgentService):
 
     def preview(self, request: CrmPreviewRequest) -> StructuredAgentResponse:
         require_role(request.context, {AgentRole.ADVISOR, AgentRole.APPROVER, AgentRole.ADMIN})
-        response = StructuredAgentResponse(agent="crm", status="blocked", summary="CRM-Änderung wurde nur als Vorschau erstellt.", output={"operation": "append_note", "contact_reference": request.contact_reference, "target_group": request.target_group, "note_preview": request.note}, approval=ApprovalState(reason="onOffice-Zugang und menschliche Freigabe sind erforderlich."))
+        response = StructuredAgentResponse(agent="crm", status="blocked", summary="CRM-Änderung wurde nur als Vorschau erstellt.", output={
+            "operation": "append_note",
+            "data_source": "simulation",
+            "read_only": True,
+            "facts_from_onoffice": [],
+            "input_information": {"contact_reference": request.contact_reference, "target_group": request.target_group},
+            "proposed_changes": {"note": request.note},
+            "missing_information": [],
+            "contact_reference": request.contact_reference,
+            "target_group": request.target_group,
+            "note_preview": request.note,
+        }, approval=ApprovalState(reason="onOffice-Schreibzugriff ist gesperrt; menschliche Freigabe bleibt erforderlich."))
         return self._finish(response, request.context, "change_preview")
 
 

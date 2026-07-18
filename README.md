@@ -1,6 +1,7 @@
-# AKZENTA AI – Version 1.4
+# AKZENTA AI – Version 1.5
 
-Version 1.4 ergänzt die sichere simulierte Agentenausführung. Der Agent Manager
+Version 1.5 ergänzt einen getrennten onOffice-Adapter im sicheren Lesemodus.
+Version 1.4 ergänzte die sichere simulierte Agentenausführung. Der Agent Manager
 unterstützt CRM, E-Mail, Termin, WhatsApp, Telefon, Marketing, Dokumente,
 Immobilientext und den allgemeinen Assistenten über eine gemeinsame interne
 Schnittstelle. Jede Ausführung bleibt lokal, markiert vorgesehene externe
@@ -47,6 +48,62 @@ Marketinginhalte veröffentlicht. Gmail, Google Calendar, WhatsApp, Vapi, Twilio
 und onOffice sind nicht angeschlossen. Spätere Klassifikatoren können über das
 `MessageClassifier`-Interface und neue Simulationen über `SimulatedAgent`
 ergänzt werden.
+
+## onOffice-Adapter (Version 1.5)
+
+Der Adapter nutzt ausschließlich die offizielle stabile onOffice-API unter
+`https://api.onoffice.de/api/stable/api.php` und HMAC Version 2. Der sichere
+Standard ist deaktiviert und `mock`; fehlende Zugangsdaten verhindern den
+Backend-Start nicht. Zugangsdaten gehören nur in lokale Umgebungsvariablen und
+niemals in Repository, Browser oder Local Storage.
+
+```env
+ONOFFICE_ENABLED=false
+ONOFFICE_MODE=mock
+ONOFFICE_API_URL=https://api.onoffice.de/api/stable/api.php
+ONOFFICE_API_TOKEN=
+ONOFFICE_API_SECRET=
+ONOFFICE_TIMEOUT_SECONDS=15
+```
+
+Für einen lokalen Verbindungstest müssen in onOffice das API-Modul aktiviert
+und ein eigener API-Benutzer angelegt werden. Dieser erhält nur die minimal
+erforderlichen Leserechte für Adressen, Immobilien und Feldkonfigurationen.
+Anschließend werden lokal `ONOFFICE_ENABLED=true`, `ONOFFICE_MODE=readonly`,
+Token und Secret gesetzt. `GET /integrations/onoffice/status` führt nur bei
+dieser vollständigen Konfiguration einen echten Test aus; im Mock-Modus findet
+kein Netzwerkzugriff statt.
+
+Lesende Endpunkte:
+
+- `GET /integrations/onoffice/status`
+- `POST /integrations/onoffice/contacts/search`
+- `GET /integrations/onoffice/contacts/{contact_id}`
+- `POST /integrations/onoffice/estates/search`
+- `GET /integrations/onoffice/estates/{estate_id}`
+
+Eine Suche verlangt bestätigte Filter, nutzt Pagination, standardmäßig zehn und
+maximal 25 Ergebnisse. Beispiel:
+
+```json
+{"filters": {"last_name": "Muster", "city": "Hamburg"}, "limit": 10, "offset": 0}
+```
+
+Die Standard-Feldzuordnung deckt Kontakt- und Immobiliendaten ab. Verfügbare
+Felder werden über die offizielle Feldkonfiguration geprüft. Abweichende oder
+mandantenspezifische Felder können per `ONOFFICE_FIELD_MAPPING_JSON` zugeordnet
+werden; unbekannte Rückgabefelder erscheinen als `unmapped_fields` und werden
+nicht automatisch interpretiert.
+
+Nicht unterstützt sind Anlage, Änderung oder Löschung von Datensätzen, E-Mail-
+Versand, Termin- oder Aufgabenerstellung und unbeschränkte Massenausgaben. Der
+CRM-Agent kennzeichnet onOffice-Daten als schreibgeschützt und erzeugt nur
+Änderungsvorschläge. Token, Secret, HMAC und vollständige API-Antworten werden
+weder in Statusantworten noch in Protokollen ausgegeben.
+
+Offizielle Hinweise: [Erste Schritte](https://apidoc.onoffice.de/erste-schritte/),
+[Feldkonfiguration](https://apidoc.onoffice.de/actions/informationen-abfragen/feldkonfiguration/)
+und [technischer Support](https://apidoc.onoffice.de/help-technical-support/).
 
 Version 0.9 ergänzt Phase 1 der sicheren Agentenarchitektur: CRM-Vorschauen,
 E-Mail-Entwürfe und Terminsimulationen. Alle Anbieter sind standardmäßig nicht

@@ -13,3 +13,8 @@ frontend/dist/
 pytest-temp/
 .pytest_cache/
 backup/
+.env
+.env.*
+!.env.example
+*.secret
+secrets/

@@ -4,6 +4,8 @@ from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, Field, field_validator
 
+from backend.integrations.onoffice.adapter import onoffice_adapter
+
 AgentTarget = Literal["crm", "email", "kalender", "whatsapp", "telefon", "marketing", "dokumente", "immobilien_text", "allgemein"]
 ExecutionStatus = Literal["simulated", "blocked", "error"]
 
@@ -109,7 +111,17 @@ class CrmSimulationAgent(BaseSimulationAgent):
     agent_name, intent = "crm", "crm_änderungsvorschlag"
     def build(self, message):
         lead = _extract(r"(?:kontakt|lead)\s+(?:für\s+)?([\wÄÖÜäöüß .-]+)", message)
-        return {"contact_or_lead": lead, "change_proposal": message, "crm_changed": False}, ([] if lead else ["Kontakt- oder Lead-Referenz"]), ["CRM-Änderung als Vorschau prüfen", "Menschliche Freigabe einholen"]
+        source = "onOffice" if onoffice_adapter.active else "Simulation"
+        return {
+            "contact_or_lead": lead,
+            "data_source": source,
+            "read_only": True,
+            "facts_from_onoffice": [],
+            "input_information": {"message": message, "contact_or_lead": lead},
+            "proposed_changes": [message],
+            "change_proposal": message,
+            "crm_changed": False,
+        }, ([] if lead else ["Kontakt- oder Lead-Referenz"]), ["CRM-Änderung als Vorschau prüfen", "Menschliche Freigabe einholen"]
 
 class EmailSimulationAgent(BaseSimulationAgent):
     agent_name, intent = "email", "email_entwurf"
@@ -166,7 +178,7 @@ class CentralAgentManager:
         if not request.simulation:
             return AgentExecutionResponse(agent=decision.agent, intent="execution_blocked", confidence=decision.confidence,
                 reasoning=decision.reason, simulation=False, status="blocked", result={"external_action_executed": False},
-                proposed_actions=["Simulationsmodus aktivieren"], warnings=["Echte Ausführung ist in Version 1.4 gesperrt."], uncertain=decision.uncertain)
+                proposed_actions=["Simulationsmodus aktivieren"], warnings=["Echte Ausführung ist in Version 1.5 gesperrt."], uncertain=decision.uncertain)
         try:
             return self.agents[decision.agent].execute(request.message, decision)
         except Exception:

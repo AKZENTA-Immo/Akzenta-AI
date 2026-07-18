@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 
-VERSION = "1.4"
+VERSION = "1.5"
 PROJECT_PATH = Path(__file__).resolve().parent.parent
 DROPBOX_PATH = Path(os.getenv("AKZENTA_DROPBOX_PATH", r"C:\Users\S. Vedder\Dropbox\AKZENTA AI"))
 CHROMA_PATH = Path(os.getenv("AKZENTA_CHROMA_PATH", str(PROJECT_PATH / "data" / "chroma")))
@@ -30,3 +30,10 @@ ABSCHNITT_ZEICHEN = int(os.getenv("AKZENTA_CHUNK_SIZE", "1000"))
 ABSCHNITT_UEBERLAPPUNG = int(os.getenv("AKZENTA_CHUNK_OVERLAP", "150"))
 AGENT_MOCK_MODE = os.getenv("AKZENTA_AGENT_MOCK_MODE", "true").lower() == "true"
 AGENT_AUDIT_LOG = Path(os.getenv("AKZENTA_AGENT_AUDIT_LOG", str(PROJECT_PATH / "data" / "agent-audit.jsonl")))
+ONOFFICE_ENABLED = os.getenv("ONOFFICE_ENABLED", "false").lower() == "true"
+ONOFFICE_MODE = os.getenv("ONOFFICE_MODE", "mock").lower()
+ONOFFICE_API_URL = os.getenv("ONOFFICE_API_URL", "https://api.onoffice.de/api/stable/api.php")
+ONOFFICE_API_TOKEN = os.getenv("ONOFFICE_API_TOKEN", "")
+ONOFFICE_API_SECRET = os.getenv("ONOFFICE_API_SECRET", "")
+ONOFFICE_TIMEOUT_SECONDS = float(os.getenv("ONOFFICE_TIMEOUT_SECONDS", "15"))
+ONOFFICE_FIELD_MAPPING_JSON = os.getenv("ONOFFICE_FIELD_MAPPING_JSON", "")
