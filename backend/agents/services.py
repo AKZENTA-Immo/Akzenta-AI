@@ -4,7 +4,8 @@ from backend.adapters.providers import CalendarAdapter, GmailAdapter, OnOfficeAd
 from backend.agents.core import AuditLogger, PromptLoader, require_role, safe_facts
 from backend.models.agent_models import (
     AgentRole, AgentStatus, ApprovalState, CalendarSimulationRequest, CrmPreviewRequest,
-    EmailDraftRequest, StructuredAgentResponse,
+    EmailDraftRequest, StructuredAgentResponse, WorkflowCoreRequest, WorkflowCoreResponse,
+    WorkflowStepResult,
 )
 
 
@@ -78,3 +79,74 @@ class CalendarAgentService(BaseAgentService):
         end = request.preferred_start + timedelta(minutes=request.duration_minutes)
         response = StructuredAgentResponse(agent="calendar", status="simulation", summary="Terminvorschlag simuliert; kein Kalender wurde verändert.", output={"title": request.purpose.strip(), "attendee_name": request.attendee_name, "start": request.preferred_start.isoformat(), "end": end.isoformat(), "timezone": request.timezone, "availability_checked": False}, approval=ApprovalState(reason="Kalenderzugang, Verfügbarkeitsprüfung und menschliche Freigabe sind erforderlich."))
         return self._finish(response, request.context, "appointment_simulation")
+
+
+class WorkflowCoreService:
+    agent_name = "workflow_core"
+
+    def __init__(self, crm: CrmAgentService, email: EmailAgentService, calendar: CalendarAgentService):
+        self.crm = crm
+        self.email = email
+        self.calendar = calendar
+        self.audit = AuditLogger()
+
+    def status(self) -> AgentStatus:
+        return AgentStatus(
+            agent=self.agent_name,
+            mode="simulation",
+            provider="internal",
+            provider_connected=False,
+            external_actions_enabled=False,
+            capabilities=["status", "crm_preview", "email_draft", "optional_calendar_simulation"],
+        )
+
+    @staticmethod
+    def _step(name: str, response: StructuredAgentResponse) -> WorkflowStepResult:
+        return WorkflowStepResult(
+            step=name,
+            status=response.status,
+            summary=response.summary,
+            output=response.output,
+            external_action_executed=response.external_action_executed,
+        )
+
+    def run(self, request: WorkflowCoreRequest) -> WorkflowCoreResponse:
+        require_role(request.context, {AgentRole.ADVISOR, AgentRole.APPROVER, AgentRole.ADMIN})
+        crm_response = self.crm.preview(CrmPreviewRequest(
+            context=request.context,
+            contact_reference=request.lead_id,
+            target_group=request.target_group,
+            note=f"Workflow-Vorschau: {request.purpose}",
+        ))
+        email_response = self.email.draft(EmailDraftRequest(
+            context=request.context,
+            recipient_name=request.recipient_name,
+            target_group=request.target_group,
+            purpose=request.purpose,
+            facts=[f"Lead-Referenz: {request.lead_id}"],
+        ))
+        steps = [self._step("crm_preview", crm_response), self._step("email_draft", email_response)]
+
+        if request.simulate_calendar:
+            calendar_response = self.calendar.simulate(CalendarSimulationRequest(
+                context=request.context,
+                attendee_name=request.recipient_name,
+                purpose=request.purpose,
+                preferred_start=request.preferred_start,
+                duration_minutes=request.duration_minutes,
+                timezone=request.timezone,
+            ))
+            steps.append(self._step("calendar_simulation", calendar_response))
+
+        response = WorkflowCoreResponse(
+            summary="Workflow sicher ausgeführt; es wurden nur Vorschau, Entwurf und Simulation erzeugt.",
+            steps=steps,
+        )
+        self.audit.record(
+            agent=self.agent_name,
+            action="core_run",
+            context=request.context,
+            request_id=response.request_id,
+            result=response.status,
+        )
+        return response

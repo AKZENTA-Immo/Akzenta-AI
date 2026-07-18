@@ -37,6 +37,34 @@ Die Rollenangabe ist in Phase 1 ein validierter Request-Kontext und noch keine p
 
 Bestehende Endpunkte unter `/dokumente`, `/wissensbasis`, `/chat`, `/immobilien-text` und `/` bleiben erhalten.
 
+## Version 1.7a: Workflow-Core
+
+Der interne Workflow-Core orchestriert mehrere bestehende Agentenfunktionen in einem sicheren Lauf. Er erstellt zuerst eine schreibgeschützte CRM-Vorschau und danach einen E-Mail-Entwurf. Optional ergänzt er eine Kalendersimulation, wenn `simulate_calendar=true` und `preferred_start` gesetzt ist.
+
+Der Workflow-Core besitzt keinen externen Provider und führt keine externen Aktionen aus: Er sendet keine E-Mail, erstellt keinen Kalendertermin und verändert keine CRM-Daten. Alle Schrittergebnisse weisen `external_action_executed=false` aus; auch der gesamte Workflow meldet diesen sicheren Zustand.
+
+| Methode | Endpunkt | Verhalten |
+|---|---|---|
+| GET | `/agents/workflows/status` | Sicherer interner Status und Fähigkeiten des Workflow-Core |
+| POST | `/agents/workflows/core/run` | CRM-Vorschau, E-Mail-Entwurf und optionale Kalendersimulation |
+
+Beispielrequest:
+
+```json
+{
+  "lead_id": "LEAD-170",
+  "recipient_name": "Testperson",
+  "target_group": "buyer",
+  "purpose": "Abstimmung zum weiteren Ablauf",
+  "simulate_calendar": true,
+  "preferred_start": "2026-07-20T10:00:00+02:00",
+  "duration_minutes": 45,
+  "timezone": "Europe/Berlin"
+}
+```
+
+Ist die Kalendersimulation aktiviert, aber `preferred_start` fehlt, wird die Anfrage mit HTTP 422 abgewiesen. Ohne aktivierte Kalendersimulation werden ausschließlich CRM-Vorschau und E-Mail-Entwurf erzeugt.
+
 ## Fehlerbehandlung
 
 - Pydantic-Validierungsfehler: HTTP 422.

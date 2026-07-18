@@ -5,7 +5,10 @@ from backend.agents.manager import agent_manager
 from backend.agents.base_agent import AgentRequest, AgentResponse
 from backend.agents.registry import agent_registry
 from backend.agents.suite import register_default_agents
-from backend.models.agent_models import CalendarSimulationRequest, CrmPreviewRequest, EmailDraftRequest
+from backend.models.agent_models import (
+    CalendarSimulationRequest, CrmPreviewRequest, EmailDraftRequest, WorkflowCoreRequest,
+    WorkflowCoreResponse,
+)
 
 router = APIRouter(prefix="/agents", tags=["Agenten"])
 register_default_agents()
@@ -46,6 +49,12 @@ def calendar_status(): return agent_manager.calendar.status()
 
 @router.post("/calendar/simulate")
 def calendar_simulate(request: CalendarSimulationRequest): return _run(lambda: agent_manager.calendar.simulate(request))
+
+@router.get("/workflows/status")
+def workflow_core_status(): return agent_manager.workflow_core.status()
+
+@router.post("/workflows/core/run", response_model=WorkflowCoreResponse)
+def workflow_core_run(request: WorkflowCoreRequest): return _run(lambda: agent_manager.workflow_core.run(request))
 
 @router.post("/{agent_name}/execute", response_model=AgentResponse)
 def direct_execute(agent_name: str, request: AgentRequest):

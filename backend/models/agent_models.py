@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Any, Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class AgentRole(str, Enum):
@@ -73,3 +73,44 @@ class CalendarSimulationRequest(BaseModel):
     preferred_start: datetime
     duration_minutes: int = Field(default=30, ge=15, le=240)
     timezone: str = Field(default="Europe/Berlin", pattern=r"^[A-Za-z_]+/[A-Za-z_]+$")
+
+
+class WorkflowCoreRequest(BaseModel):
+    context: AgentContext = Field(default_factory=AgentContext)
+    lead_id: str = Field(min_length=2, max_length=100)
+    recipient_name: str = Field(min_length=2, max_length=100)
+    target_group: Literal["seller", "buyer", "investor"]
+    purpose: str = Field(min_length=3, max_length=500)
+    preferred_start: datetime | None = None
+    simulate_calendar: bool = False
+    duration_minutes: int = Field(default=30, ge=15, le=240)
+    timezone: str = Field(default="Europe/Berlin", pattern=r"^[A-Za-z_]+/[A-Za-z_]+$")
+
+    @field_validator("lead_id", "recipient_name", "purpose")
+    @classmethod
+    def strip_workflow_text(cls, value: str) -> str:
+        return value.strip()
+
+    @model_validator(mode="after")
+    def require_start_for_calendar_simulation(self):
+        if self.simulate_calendar and self.preferred_start is None:
+            raise ValueError("preferred_start ist bei aktivierter Kalendersimulation erforderlich.")
+        return self
+
+
+class WorkflowStepResult(BaseModel):
+    step: Literal["crm_preview", "email_draft", "calendar_simulation"]
+    status: Literal["draft", "simulation", "blocked"]
+    summary: str
+    output: dict[str, Any]
+    external_action_executed: bool = False
+
+
+class WorkflowCoreResponse(BaseModel):
+    request_id: str = Field(default_factory=lambda: str(uuid4()))
+    agent: Literal["workflow_core"] = "workflow_core"
+    status: Literal["completed"] = "completed"
+    summary: str
+    steps: list[WorkflowStepResult]
+    external_action_executed: bool = False
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
