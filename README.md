@@ -412,3 +412,18 @@ Der neue Phone Agent unter `backend/phone/` verarbeitet mehrstufige Telefongespr
 Faktenantworten kommen ausschließlich aus dem lokalen `KnowledgeService`. Fehlt ein belegter Treffer, antwortet der Agent: „Darauf habe ich aktuell keine gesicherte Information.“ Ollama bleibt der lokale Chat-/Embedding-Provider; Cloud-Dienste werden nicht verwendet.
 
 STT und TTS sind über `STTAdapter` und `TTSAdapter` entkoppelt. `/phone/message` akzeptiert Text oder Base64-Audio und kann optional Base64-Audio zurückgeben. Offline-Engines wie whisper.cpp, faster-whisper, Vosk, Piper oder Coqui können implementiert und injiziert werden. Ohne konfigurierten Adapter wird keine Engine erzwungen. Relevante Umgebungsvariablen sind `AKZENTA_PHONE_DB`, `AKZENTA_PHONE_STT_ENGINE`, `AKZENTA_PHONE_TTS_ENGINE`, `AKZENTA_PHONE_LANGUAGE` und `AKZENTA_PHONE_KNOWLEDGE_TOP_K`.
+# AKZENTA AI Operator Dashboard (Version 2.1)
+
+Das Operator Dashboard ist ein ausschließlich lesender Leitstand für Telefonate, Transkripte, Leads, Workflow-Fortschritt, Wissensquellen, Agentenstatus, Ereignisse und Kennzahlen. Es projiziert die bestehenden Phone-, Workflow- und Knowledge-Daten; es führt keine CRM-, E-Mail- oder Workflow-Schreibaktionen aus.
+
+## Start
+
+Backend wie bisher starten und anschließend im Ordner `frontend` `npm run dev` ausführen. Das Dashboard ist die Startseite unter `http://127.0.0.1:5173`; die API wird standardmäßig unter `http://127.0.0.1:8010` erwartet.
+
+## Dashboard API
+
+Lesende GET-Endpunkte: `/dashboard/overview`, `/dashboard/conversations`, `/dashboard/conversations/{session_id}`, `/dashboard/statistics`, `/dashboard/workflows`, `/dashboard/workflows/{workflow_id}`, `/dashboard/leads`, `/dashboard/agents`, `/dashboard/events`, `/dashboard/notifications` und `/dashboard/events/stream`. Listen unterstützen je nach Ressource Zeitraum, Status, Agent, Workflow-/Lead-Typ, Suche, Limit und Offset. Das Limit ist auf 500 begrenzt.
+
+Live-Ereignisse werden per Server-Sent Events (`text/event-stream`) mit Keepalive übertragen. Der Browser schließt die Verbindung beim Verlassen der Seite. Events und Benachrichtigungen liegen additiv in `data/dashboard.sqlite3`.
+
+Datenschutz: Das Dashboard gibt keine Audiodaten oder Zugangsdaten aus und protokolliert keine Kontaktangaben. Personenbezogene Angaben werden nur aus den bestehenden Quelldaten gelesen. Bekannte Einschränkung: Ein Lead ist bis zur Einführung eines eigenen CRM-Lead-Repositorys eine lesende Projektion einer Telefonsitzung; fehlende Felder bleiben leer. Ollama wird im Statuspanel bewusst nicht über einen zusätzlichen Netzwerkaufruf geprüft.

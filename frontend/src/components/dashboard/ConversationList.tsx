@@ -1,0 +1,2 @@
+import type { DashboardConversation } from '../../models/api'
+export function ConversationList({items,onSelect}:{items:DashboardConversation[];onSelect:(id:string)=>void}) { if(!items.length)return <p className="empty-state">Keine Gespräche im gewählten Zeitraum.</p>; return <div className="operator-list">{items.map(x=><button key={x.session_id} onClick={()=>onSelect(x.session_id)}><b>{x.name||'Unbekannter Kontakt'}</b><span>{x.status} · {new Date(x.started_at).toLocaleString('de-DE')}</span><small>{x.intent||x.session_id}</small></button>)}</div> }

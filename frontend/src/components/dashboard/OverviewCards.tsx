@@ -1,0 +1,2 @@
+import type { DashboardOverview } from '../../models/api'
+export function OverviewCards({data}:{data:DashboardOverview}) { const cards=[['Gespräche heute',data.conversations_today],['Neue Leads',data.new_leads],['Termine',data.open_appointments],['Eskalationen',data.open_escalations],['Aktive Workflows',data.active_workflows],['Agentenfehler',data.agent_statuses.filter(x=>x.status==='error').length]]; return <section className="operator-kpis">{cards.map(([label,value])=><article key={label}><small>{label}</small><strong>{value}</strong></article>)}</section> }

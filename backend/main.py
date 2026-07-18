@@ -12,6 +12,7 @@ from backend.routers.agent_manager import router as agent_manager_router
 from backend.routers.onoffice import router as onoffice_router
 from backend.routers.knowledge import router as knowledge_router
 from backend.routers.phone import router as phone_router
+from backend.routers.dashboard import router as dashboard_router
 from backend.responses import UTF8JSONResponse
 
 
@@ -32,6 +33,7 @@ app.include_router(agent_manager_router)
 app.include_router(onoffice_router)
 app.include_router(knowledge_router)
 app.include_router(phone_router)
+app.include_router(dashboard_router)
 
 
 @app.get("/")

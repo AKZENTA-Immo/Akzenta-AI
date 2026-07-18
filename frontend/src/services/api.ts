@@ -1,4 +1,4 @@
-import type { AgentExecutionResponse, AgentKind, AgentManagerResponse, AgentResponse, AgentStatus, BackendInfo, ChatRequest, ChatResponse, ChatStatus, DocumentDetails, DocumentFilters, DocumentListResponse, DocumentSectionsResponse, DocumentStatistics, IndexingResponse, KnowledgeStatus, OnOfficeStatus } from '../models/api'
+import type { AgentExecutionResponse, AgentKind, AgentManagerResponse, AgentResponse, AgentStatus, BackendInfo, ChatRequest, ChatResponse, ChatStatus, DashboardAgentStatus, DashboardConversation, DashboardEvent, DashboardLead, DashboardOverview, DashboardStatistics, DashboardWorkflow, DocumentDetails, DocumentFilters, DocumentListResponse, DocumentSectionsResponse, DocumentStatistics, IndexingResponse, KnowledgeStatus, OnOfficeStatus } from '../models/api'
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8010').replace(/\/$/, '')
 const REQUEST_TIMEOUT_MS = 210_000
@@ -71,3 +71,12 @@ export const simulateAppointment = (payload: { attendee_name: string; purpose: s
 export const routeAgentMessage = (message: string, simulation = true): Promise<AgentManagerResponse> => requestJson('/agent-manager/route', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, simulation }) })
 export const executeAgentMessage = (message: string, simulation = true): Promise<AgentExecutionResponse> => requestJson('/agent-manager/execute', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, simulation }) })
 export const getOnOfficeStatus = (): Promise<OnOfficeStatus> => requestJson('/integrations/onoffice/status')
+export const getDashboardOverview=():Promise<DashboardOverview>=>requestJson('/dashboard/overview')
+export const getDashboardConversations=(query=''):Promise<DashboardConversation[]>=>requestJson(`/dashboard/conversations${query}`)
+export const getDashboardConversation=(id:string):Promise<DashboardConversation>=>requestJson(`/dashboard/conversations/${encodeURIComponent(id)}`)
+export const getDashboardWorkflows=(query=''):Promise<DashboardWorkflow[]>=>requestJson(`/dashboard/workflows${query}`)
+export const getDashboardLeads=(query=''):Promise<DashboardLead[]>=>requestJson(`/dashboard/leads${query}`)
+export const getDashboardStatistics=(query=''):Promise<DashboardStatistics>=>requestJson(`/dashboard/statistics${query}`)
+export const getDashboardAgents=():Promise<DashboardAgentStatus[]>=>requestJson('/dashboard/agents')
+export const getDashboardNotifications=():Promise<DashboardEvent[]>=>requestJson('/dashboard/notifications')
+export const openDashboardEvents=(onEvent:()=>void):EventSource|null=>{ if(typeof EventSource==='undefined')return null; const source=new EventSource(`${API_BASE_URL}/dashboard/events/stream`); source.onmessage=onEvent; return source }

@@ -186,3 +186,14 @@ Der `CallManager` koordiniert Gesprächszustand, Dialog, Termin, Eskalation und 
 Die Intent-Erkennung umfasst Begrüßung, Rückruf, Verkäufer, Kapitalanlage, Besichtigung, Termin, Dokumente, Preis, Objektfrage, Finanzierung, Ablehnung, Verabschiedung und Unbekannt. Beschwerden, Konflikte, rechtliche Fragen, technische Probleme, Unsicherheit oder der ausdrückliche Wunsch nach einem Mitarbeiter lösen eine Übergabe aus.
 
 Jeder Anruf startet die Workflow-Definition `phone_conversation`. Sie registriert die Actions `phone_call`, `appointment_booking`, `email_followup`, `crm_update`, `knowledge_lookup` und `handover`. CRM-Schreibzugriffe bleiben Vorschauen, Follow-up-Mails bleiben Entwürfe und Termine bleiben lokale Reservierungen. Alle Komponenten sind über Konstruktor-Injektion austauschbar.
+# Operator Dashboard 2.1
+
+Das Dashboard-Modul trennt Conversation-, Workflow- und Lead-Monitor, Statistik, Agentenstatus und Event-Persistenz. `DashboardService` aggregiert diese injizierten, testbaren Lesedienste für das Overview. Der API-Router enthält ausschließlich GET-Routen.
+
+Datenfluss: Phone-Agent-SQLite → Conversation/Lead Monitor; Workflow-Repository-SQLite → Workflow Monitor; vorhandene Quellenmetadaten → Knowledge Panel; beide Pfade → Statistik/Overview → REST beziehungsweise SSE → React-Dashboard. Es gibt kein paralleles Telefon-, CRM- oder Workflow-System.
+
+`dashboard_events` speichert unveränderliche Hinweise mit Typ, Severity, Entitätsbezug, JSON-Metadaten und Zeitstempel. `dashboard_notifications` speichert die lesbare Benachrichtigungsprojektion. Beide Tabellen werden mit `CREATE TABLE IF NOT EXISTS` additiv angelegt. Der SSE-Dienst pollt austauschbar, sendet nur neue Events und Keepalives und behandelt Client-Abbruch durch Generator-Cancellation.
+
+Agentenstatus kennt `running`, `idle`, `degraded`, `unavailable` und `error`. Phone Agent, CRM Agent, Email Agent, Marketing Agent, Workflow Engine, Knowledge Engine, Ollama und SQLite werden lokal bewertet; Ollama wird dafür nicht eigens aufgerufen.
+
+Sicherheitsgrenzen: keine Dashboard-Endpunkte zum Ändern oder Löschen, kein Starten von Workflows, keine Übernahme von Gesprächen, kein Versand und keine CRM-Änderung. Es werden weder Audio noch Secrets ausgegeben. Suche verwendet ausschließlich gebundene SQL-Parameter.

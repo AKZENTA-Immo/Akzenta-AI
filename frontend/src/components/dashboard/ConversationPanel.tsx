@@ -1,0 +1,2 @@
+import type { DashboardConversation } from '../../models/api'; import {ConversationList} from './ConversationList'; import {TranscriptPanel} from './TranscriptPanel'
+export function ConversationPanel({items,selected,onSelect}:{items:DashboardConversation[];selected:DashboardConversation|null;onSelect:(id:string)=>void}) { return <section className="operator-panel"><h2>Laufende und letzte Gespräche</h2><div className="conversation-layout"><ConversationList items={items} onSelect={onSelect}/><TranscriptPanel conversation={selected}/></div></section> }

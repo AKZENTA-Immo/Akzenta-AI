@@ -1,0 +1,7 @@
+from .models import DashboardStatistics
+class StatisticsService:
+    def __init__(self,conversations,workflows,leads): self.conversations=conversations; self.workflows=workflows; self.leads=leads
+    def calculate(self,date_from=None,date_to=None):
+        f={'date_from':date_from,'date_to':date_to,'limit':10000,'offset':0}; calls=self.conversations.list(**f); workflows=self.workflows.list(**f); leads=self.leads.list(**f)
+        durations=[c.duration_seconds for c in calls if c.duration_seconds]
+        return DashboardStatistics(conversations=len(calls),active_conversations=sum(c.status=='active' for c in calls),completed_conversations=sum(c.status=='completed' for c in calls),average_duration_seconds=round(sum(durations)/len(durations),2) if durations else 0,new_leads=len(leads),average_lead_score=round(sum(x.lead_score for x in leads)/len(leads),2) if leads else 0,seller_leads=sum(x.lead_type=='seller' for x in leads),investment_leads=sum(x.lead_type=='investment' for x in leads),appointments=sum(bool(c.appointment_status) for c in calls),followups=sum(bool(c.followup_status) for c in calls),escalations=sum(bool(c.escalation_status) for c in calls),abandoned_conversations=sum(c.status in ('abandoned','cancelled') for c in calls),knowledge_lookups=sum(len(c.knowledge_sources) for c in calls),successful_workflows=sum(w.status=='completed' for w in workflows),failed_workflows=sum(w.status=='failed' for w in workflows))
