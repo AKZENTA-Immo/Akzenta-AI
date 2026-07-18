@@ -4,11 +4,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ChatPage } from '../pages/ChatPage'
 import * as api from '../services/api'
 
-vi.mock('../services/api', () => ({ sendDocumentQuestion: vi.fn() }))
+vi.mock('../services/api', () => ({ sendDocumentQuestion: vi.fn(), routeAgentMessage: vi.fn() }))
 const send = vi.mocked(api.sendDocumentQuestion)
+const route = vi.mocked(api.routeAgentMessage)
 
 describe('ChatPage', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    route.mockResolvedValue({ agent: 'dokumente', confidence: .9, reason: 'Dokumenten-Schlüsselwörter erkannt', original_message: 'Frage', simulation: true, result: { status: 'simulated', external_action_executed: false } })
+  })
 
   it('wird mit Beispielfragen geladen', () => {
     render(<ChatPage />)
@@ -31,7 +35,10 @@ describe('ChatPage', () => {
     })
     await waitFor(() => expect(screen.getByText('Inflationsschutz', { selector: 'strong' })).toBeInTheDocument())
     expect(screen.getByText('Leitfaden.pdf')).toBeInTheDocument()
+    expect(screen.getByLabelText('Agenten-Zuordnung')).toHaveTextContent('Agent: dokumente')
+    expect(screen.getByLabelText('Agenten-Zuordnung')).toHaveTextContent('Simulation aktiv')
     expect(send).toHaveBeenCalledWith({ frage: 'Welche Vorteile gibt es?', limit: 5 })
+    expect(route).toHaveBeenCalledWith('Welche Vorteile gibt es?', true)
   })
 
   it('zeigt Backend-Fehler verständlich an', async () => {

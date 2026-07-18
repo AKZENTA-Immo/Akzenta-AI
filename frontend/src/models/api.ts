@@ -84,3 +84,5 @@ export interface DocumentStatistics { gesamt: number; nach_dateityp: Record<stri
 export type AgentKind = 'crm' | 'email' | 'calendar'
 export interface AgentStatus { agent: AgentKind; mode: 'mock' | 'draft' | 'simulation' | 'connected'; provider: string; provider_connected: boolean; external_actions_enabled: boolean; prompt_version: string; capabilities: string[] }
 export interface AgentResponse { request_id: string; agent: AgentKind; status: 'draft' | 'simulation' | 'blocked'; summary: string; output: Record<string, unknown>; approval: { required: boolean; approved: boolean; approval_id: string; reason: string }; external_action_executed: boolean; created_at: string }
+export type AgentManagerTarget = 'crm' | 'email' | 'kalender' | 'dokumente' | 'immobilien_text' | 'allgemein'
+export interface AgentManagerResponse { agent: AgentManagerTarget; confidence: number; reason: string; original_message: string; simulation: boolean; result: { status: 'simulated' | 'blocked'; external_action_executed: boolean } }

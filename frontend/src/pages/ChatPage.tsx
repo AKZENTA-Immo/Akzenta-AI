@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import type { ChatResponse } from '../models/api'
-import { sendDocumentQuestion } from '../services/api'
+import type { AgentManagerResponse, ChatResponse } from '../models/api'
+import { routeAgentMessage, sendDocumentQuestion } from '../services/api'
 import { ChatInput } from '../components/ChatInput'
 import { ChatMessage } from '../components/ChatMessage'
 import { ErrorMessage } from '../components/ErrorMessage'
@@ -10,6 +10,7 @@ interface ChatHistoryItem {
   id: string
   frage: string
   response: ChatResponse
+  routing?: AgentManagerResponse
 }
 
 const CHAT_STORAGE_KEY = 'akzenta-chat-history'
@@ -90,13 +91,17 @@ export function ChatPage() {
     setSuggestion('')
 
     try {
-      const answer = await sendDocumentQuestion({ frage, limit: 5 })
+      const [answer, routing] = await Promise.all([
+        sendDocumentQuestion({ frage, limit: 5 }),
+        routeAgentMessage(frage, true),
+      ])
       setHistory((previous) => [
         ...previous,
         {
           id: crypto.randomUUID(),
           frage,
           response: answer,
+          routing,
         },
       ])
     } catch (err) {
@@ -180,6 +185,14 @@ export function ChatPage() {
           </div>
 
           <ChatMessage response={item.response} />
+
+          {item.routing && (
+            <div className="agent-routing" aria-label="Agenten-Zuordnung">
+              <strong>Agent: {item.routing.agent.replace('_', ' ')}</strong>
+              <span>{item.routing.reason}</span>
+              <span>{item.routing.simulation ? 'Simulation aktiv' : 'Ausführung blockiert'}</span>
+            </div>
+          )}
 
           <div className="conversation-actions">
             <button

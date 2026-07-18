@@ -1,4 +1,33 @@
-# AKZENTA AI – Version 0.9
+# AKZENTA AI – Version 1.3
+
+Version 1.3 ergänzt einen zentralen Agent Manager. Er klassifiziert Anfragen
+lokal und deterministisch als `crm`, `email`, `kalender`, `dokumente`,
+`immobilien_text` oder `allgemein`. Die bestehende Chatansicht zeigt nach jeder
+Anfrage den gewählten Agenten, die Begründung und den Simulationsstatus.
+
+## Agent Manager
+
+`POST /agent-manager/route` nimmt eine Nachricht und einen optionalen
+Simulationsschalter entgegen:
+
+```json
+{
+  "message": "Schreibe Herrn Müller eine E-Mail mit der Terminbestätigung",
+  "simulation": true
+}
+```
+
+Weitere Beispiele sind „Aktualisiere den CRM-Kontakt“, „Suche das PDF in der
+Wissensbasis“, „Plane einen Besichtigungstermin“ und „Erstelle einen Exposétext“.
+Die Antwort enthält Agent, Konfidenz, kurze Begründung, Originalnachricht,
+Simulationsstatus und ein strukturiertes Ergebnis.
+
+Das Routing führt grundsätzlich keine externe Aktion aus. Ohne expliziten
+Simulationswert ist die Simulation aktiviert; `simulation: false` blockiert die
+Ausführung ebenfalls. Es werden weder E-Mails versendet noch Kalender oder CRM
+verändert. Spätere Klassifikatoren können über das `MessageClassifier`-Interface
+ergänzt werden. Telefon- und WhatsApp-Agenten sind mögliche spätere Zielklassen,
+werden in Version 1.3 jedoch ausdrücklich nicht angebunden.
 
 Version 0.9 ergänzt Phase 1 der sicheren Agentenarchitektur: CRM-Vorschauen,
 E-Mail-Entwürfe und Terminsimulationen. Alle Anbieter sind standardmäßig nicht
