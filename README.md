@@ -1,11 +1,65 @@
-# AKZENTA AI – Version 1.5
+# AKZENTA AI – Version 1.6.0
 
-Version 1.5 ergänzt einen getrennten onOffice-Adapter im sicheren Lesemodus.
+Version 1.6 führt die lokalen Agenten über eine gemeinsame Basisklasse und eine
+zentrale Registry aus. Version 1.5 ergänzte einen getrennten onOffice-Adapter im sicheren Lesemodus.
 Version 1.4 ergänzte die sichere simulierte Agentenausführung. Der Agent Manager
 unterstützt CRM, E-Mail, Termin, WhatsApp, Telefon, Marketing, Dokumente,
 Immobilientext und den allgemeinen Assistenten über eine gemeinsame interne
 Schnittstelle. Jede Ausführung bleibt lokal, markiert vorgesehene externe
 Schritte als freigabepflichtig und verändert keine Drittsysteme.
+
+## Einheitliche Agenten-Suite
+
+`backend/agents/base_agent.py` definiert `AgentRequest`, `AgentResponse` und die
+gemeinsame `BaseAgent`-Schnittstelle. Jeder Agent erkennt eine Aktion, validiert
+fehlende Angaben, erzeugt eine strukturierte lokale Simulation und bietet einen
+Health Check. Die Registry in `backend/agents/registry.py` verwaltet und startet
+Agenten ohne Ausführungs-`if/elif`-Kette im Agent Manager.
+
+Registrierte Agenten und Schwerpunkte:
+
+- CRM-Agent: Leads suchen, qualifizieren sowie Änderungen und onOffice-Suchen vorbereiten
+- E-Mail-Agent: Entwürfe, Antworten, Bestätigungen und Nachfassmails
+- Kalender-Agent: Besichtigungen, Gespräche, Rückrufe und Terminänderungen vorbereiten
+- Dokumenten-Agent: vorhandene Dokumentensuche und Wissensbasis adressieren
+- Immobilien-Agent: Exposé-, Lage-, Zielgruppen- und Anzeigentexte strukturieren
+- Marketing-Agent: Posts, Newsletter, Kampagnen, Videos und Content-Pläne entwerfen
+- Telefon-Agent: Gesprächsleitfäden, Qualifizierung und Einwandbehandlung simulieren
+- WhatsApp-Agent: kurze Nachrichten ausschließlich als Entwurf vorbereiten
+- Allgemeiner Assistent: sicherer Fallback mit Rückfragen bei unklaren Aufgaben
+
+Die deterministische Klassifizierung liefert einen Primäragenten, erkannte
+Sekundärfähigkeiten, Aktion, Begründung und Confidence. Bei kombinierten
+Anfragen gelten feste Prioritäten, beispielsweise WhatsApp vor E-Mail,
+E-Mail vor Kalender und Dokumentensuche vor CRM.
+
+Zusätzliche API-Endpunkte:
+
+- `GET /agents` – registrierte Agenten, Beschreibungen und Fähigkeiten
+- `GET /agents/health` – Registry- und Agentenstatus
+- `POST /agents/{agent_name}/execute` – direkte sichere Agentensimulation
+
+`POST /agent-manager/route` klassifiziert und validiert über die Registry;
+`POST /agent-manager/execute` liefert die vollständige strukturierte
+Agentenantwort. Beispiel:
+
+```json
+{
+  "message": "Schreibe Herrn Müller eine E-Mail zur Besichtigung.",
+  "simulation": true,
+  "context": {}
+}
+```
+
+Der Simulationsmodus ist standardmäßig aktiv. `simulation=false` blockiert
+verändernde Aktionen. Es werden keine E-Mails oder WhatsApp-Nachrichten
+versendet, keine Telefonate geführt, keine Termine gespeichert, keine Inhalte
+veröffentlicht und keine onOffice-Daten verändert. Der bestehende onOffice-
+Adapter bleibt auf Mock beziehungsweise gezielten Read-only-Zugriff begrenzt.
+Absolute lokale Pfade, Tracebacks und Zugangsdaten werden nicht an das Frontend
+weitergegeben. Gmail, Google/Microsoft Calendar, Meta WhatsApp, Vapi und Twilio
+sind weiterhin nicht angeschlossen und benötigen später eine separate,
+ausdrückliche Freigabe- und Berechtigungsarchitektur.
 
 Version 1.3 ergänzt einen zentralen Agent Manager. Er klassifiziert Anfragen
 lokal und deterministisch als `crm`, `email`, `kalender`, `dokumente`,

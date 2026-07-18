@@ -198,13 +198,15 @@ export function ChatPage() {
 
           {item.execution && (
             <section className="agent-execution" aria-label="Agentenausführung">
-              <header><b>Agent ausgeführt</b><strong>{item.execution.agent.replace('_', ' ')}</strong><span>{Math.round(item.execution.confidence * 100)} % Sicherheit{item.execution.uncertain ? ' · Zuordnung unsicher' : ''}</span></header>
+              <header><b>Agent ausgeführt</b><strong>{item.execution.display_name || item.execution.agent.replace('_', ' ')}</strong><span>{Math.round(item.execution.confidence * 100)} % Sicherheit{item.execution.uncertain ? ' · Zuordnung unsicher' : ''}</span></header>
+              <p><strong>Erkannte Aktion:</strong> {(item.execution.action || item.execution.intent).replaceAll('_', ' ')}</p>
               <p>{item.execution.reasoning}</p>
               <div className="agent-simulation-label">Simulation aktiv · {item.execution.approval_required ? 'Freigabe erforderlich' : 'Keine Freigabe erforderlich'}</div>
               <pre>{JSON.stringify(item.execution.result, null, 2)}</pre>
               {item.execution.missing_information.length > 0 && <div><b>Fehlende Angaben</b><ul>{item.execution.missing_information.map(value => <li key={value}>{value}</li>)}</ul></div>}
               {item.execution.proposed_actions.length > 0 && <div><b>Geplante Aktionen</b><ul>{item.execution.proposed_actions.map(value => <li key={value}>{value}</li>)}</ul></div>}
               {item.execution.warnings.map(value => <small key={value}>{value}</small>)}
+              {item.execution.requires_confirmation && <small>Rückfrage oder Bestätigung erforderlich</small>}
             </section>
           )}
 

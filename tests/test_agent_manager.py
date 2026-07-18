@@ -11,7 +11,7 @@ client = TestClient(app)
     ("Schreibe Herrn Müller eine E-Mail mit der Terminbestätigung", "email"),
     ("Plane einen Termin im Kalender für die Besichtigung", "kalender"),
     ("Suche das PDF in unserer Wissensbasis", "dokumente"),
-    ("Erstelle einen Exposétext für diese Wohnung", "immobilien_text"),
+    ("Erstelle einen Exposétext für diese Wohnung", "immobilien"),
     ("Wie kannst du mich heute unterstützen?", "allgemein"),
     ("Eine völlig unbekannte Anfrage ohne Fachbegriff", "allgemein"),
 ])
@@ -55,7 +55,7 @@ def test_internal_errors_do_not_expose_absolute_paths(monkeypatch):
     ("Erstelle einen Gesprächsleitfaden für den Rückruf", "telefon"),
     ("Erstelle eine Instagram Marketing Kampagne", "marketing"),
     ("Finde das Dokument in der Wissensbasis", "dokumente"),
-    ("Schreibe einen Exposétext für ein Haus", "immobilien_text"),
+    ("Schreibe einen Exposétext für ein Haus", "immobilien"),
     ("Hilf mir bei einer allgemeinen Frage", "allgemein"),
 ])
 def test_execute_all_agents_safely(message, agent):
