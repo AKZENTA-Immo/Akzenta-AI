@@ -197,3 +197,9 @@ Datenfluss: Phone-Agent-SQLite → Conversation/Lead Monitor; Workflow-Repositor
 Agentenstatus kennt `running`, `idle`, `degraded`, `unavailable` und `error`. Phone Agent, CRM Agent, Email Agent, Marketing Agent, Workflow Engine, Knowledge Engine, Ollama und SQLite werden lokal bewertet; Ollama wird dafür nicht eigens aufgerufen.
 
 Sicherheitsgrenzen: keine Dashboard-Endpunkte zum Ändern oder Löschen, kein Starten von Workflows, keine Übernahme von Gesprächen, kein Versand und keine CRM-Änderung. Es werden weder Audio noch Secrets ausgegeben. Suche verwendet ausschließlich gebundene SQL-Parameter.
+
+# Conversation Engine 2.2 – Persistenzkern
+
+Die Conversation Engine verwendet eine eigene SQLite-Datenbank (`AKZENTA_CONVERSATION_DB`) und versionierte, idempotente Migrationen. Schema-Version 1 legt `conversations`, `participants`, `messages`, `events`, `attachments`, `tags`, `message_links`, `conversation_state` und `conversation_memory` an. Eine unbekannte neuere Schema-Version wird sicher abgelehnt.
+
+`ConversationRepository` kapselt sämtliche SQL-Zugriffe, aktiviert Fremdschlüssel und WAL und nutzt gebundene Parameter. Teilnehmeridentitäten sind für Telefon, Mobiltelefon, E-Mail, CRM und onOffice indexiert. Anhänge werden über Inhalts-Hash beziehungsweise vorhandene Dokument-ID global dedupliziert; `message_links` referenziert dieselbe Anlage oder dasselbe RAG-Dokument aus beliebig vielen Nachrichten, ohne Dokumentinhalte erneut zu speichern.
